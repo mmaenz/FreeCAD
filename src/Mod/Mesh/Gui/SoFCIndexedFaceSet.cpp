@@ -29,6 +29,7 @@
 
 #ifndef _PreComp_
 # include <algorithm>
+# include <climits>
 # ifdef FC_OS_MACOSX
 # include <OpenGL/gl.h>
 # include <OpenGL/glu.h>
@@ -414,7 +415,7 @@ bool MeshRenderer::shouldRenderDirectly(bool direct)
 
 // ----------------------------------------------------------------------------
 
-SO_ENGINE_SOURCE(SoFCMaterialEngine);
+SO_ENGINE_SOURCE(SoFCMaterialEngine)
 
 SoFCMaterialEngine::SoFCMaterialEngine()
 {
@@ -445,7 +446,7 @@ void SoFCMaterialEngine::evaluate()
 
 // ----------------------------------------------------------------------------
 
-SO_NODE_SOURCE(SoFCIndexedFaceSet);
+SO_NODE_SOURCE(SoFCIndexedFaceSet)
 
 void SoFCIndexedFaceSet::initClass()
 {
@@ -453,7 +454,7 @@ void SoFCIndexedFaceSet::initClass()
 }
 
 SoFCIndexedFaceSet::SoFCIndexedFaceSet()
-  : renderTriangleLimit(100000)
+  : renderTriangleLimit(UINT_MAX)
   , selectBuf(0)
 {
     SO_NODE_CONSTRUCTOR(SoFCIndexedFaceSet);
@@ -495,7 +496,7 @@ void SoFCIndexedFaceSet::GLRender(SoGLRenderAction *action)
     // use VBO for fast rendering if possible
     if (useVBO) {
         if (updateGLArray.getValue()) {
-            updateGLArray = false;
+            updateGLArray.setValue(false);
             generateGLArrays(action);
         }
 
@@ -532,7 +533,7 @@ void SoFCIndexedFaceSet::drawFaces(SoGLRenderAction *action)
             SoMaterialBundle mb(action);
             mb.sendFirst();
             if (updateGLArray.getValue()) {
-                updateGLArray = false;
+                updateGLArray.setValue(false);
                 generateGLArrays(action);
             }
             render.renderFacesGLArray(action);
@@ -669,7 +670,7 @@ void SoFCIndexedFaceSet::drawCoords(const SoGLCoordinateElement * const vertexli
 
 void SoFCIndexedFaceSet::invalidate()
 {
-    updateGLArray = true;
+    updateGLArray.setValue(true);
 }
 
 void SoFCIndexedFaceSet::generateGLArrays(SoGLRenderAction * action)
@@ -728,7 +729,7 @@ void SoFCIndexedFaceSet::generateGLArrays(SoGLRenderAction * action)
             // the nindices must have the length of numindices
             int32_t vertex = 0;
             int index = 0;
-            float t = transp[0];
+            float t = transp ? transp[0] : 0;
             for (std::size_t i=0; i<numTria; i++) {
                 const SbColor& c = pcolors[i];
                 for (int j=0; j<3; j++) {
@@ -766,7 +767,7 @@ void SoFCIndexedFaceSet::generateGLArrays(SoGLRenderAction * action)
             // the nindices must have the length of numindices
             int32_t vertex = 0;
             int index = 0;
-            float t = transp[0];
+            float t = transp ? transp[0] : 0;
             for (std::size_t i=0; i<numTria; i++) {
                 for (int j=0; j<3; j++) {
                     const SbColor& c = pcolors[mindices[index]];
@@ -976,8 +977,7 @@ void SoFCIndexedFaceSet::stopSelection(SoAction * action)
 
     delete [] selectBuf;
     selectBuf = 0;
-    bool sorted = true;
-    if(sorted) std::sort(hit.begin(),hit.end());
+    std::sort(hit.begin(),hit.end());
 
     Gui::SoGLSelectAction *doaction = static_cast<Gui::SoGLSelectAction*>(action);
     doaction->indices.reserve(hit.size());

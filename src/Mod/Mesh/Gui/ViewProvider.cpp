@@ -93,6 +93,7 @@
 #include <Mod/Mesh/App/Core/Visitor.h>
 #include <Mod/Mesh/App/Mesh.h>
 #include <Mod/Mesh/App/MeshFeature.h>
+#include <Mod/Mesh/Gui/ViewProviderMeshPy.h>
 #include <zipios++/gzipoutputstream.h>
 #include <boost/bind.hpp>
 
@@ -348,7 +349,7 @@ void ViewProviderMesh::onChanged(const App::Property* prop)
         pcPointStyle->pointSize = PointSize.getValue();
     }
     else if (prop == &CreaseAngle) {
-        pShapeHints->creaseAngle = (F_PI*CreaseAngle.getValue())/180.0;
+        pShapeHints->creaseAngle = Base::toRadians<float>(CreaseAngle.getValue());
     }
     else if (prop == &OpenEdges) {
         showOpenEdges(OpenEdges.getValue());
@@ -367,7 +368,7 @@ void ViewProviderMesh::onChanged(const App::Property* prop)
         pLineColor->diffuseColor.setValue(c.r,c.g,c.b);
     }
     else if (prop == &Coloring) {
-        tryColorPerVertex(Coloring.getValue());
+        tryColorPerVertexOrFace(Coloring.getValue());
     }
     else {
         // Set the inverse color for open edges
@@ -537,7 +538,7 @@ App::PropertyColorList* ViewProviderMesh::getColorProperty() const
     return 0; // no such property found
 }
 
-void ViewProviderMesh::tryColorPerVertex(bool on)
+void ViewProviderMesh::tryColorPerVertexOrFace(bool on)
 {
     if (on) {
         App::PropertyColorList* colors = getColorProperty();
@@ -545,9 +546,13 @@ void ViewProviderMesh::tryColorPerVertex(bool on)
             const Mesh::PropertyMeshKernel& meshProp = static_cast<Mesh::Feature*>(pcObject)->Mesh;
             const Mesh::MeshObject& mesh = meshProp.getValue();
             int numPoints = static_cast<int>(mesh.countPoints());
+            int numFacets = static_cast<int>(mesh.countFacets());
 
             if (colors->getSize() == numPoints) {
                 setColorPerVertex(colors);
+            }
+            else if (colors->getSize() == numFacets) {
+                setColorPerFace(colors);
             }
         }
     }
@@ -563,6 +568,22 @@ void ViewProviderMesh::setColorPerVertex(const App::PropertyColorList* prop)
     pcMatBinding->value = SoMaterialBinding::PER_VERTEX_INDEXED;
     const std::vector<App::Color>& val = prop->getValues();
 
+    pcShapeMaterial->diffuseColor.setNum(val.size());
+    SbColor* col = pcShapeMaterial->diffuseColor.startEditing();
+
+    std::size_t i=0;
+    for (std::vector<App::Color>::const_iterator it = val.begin(); it != val.end(); ++it) {
+        col[i++].setValue(it->r, it->g, it->b);
+    }
+
+    pcShapeMaterial->diffuseColor.finishEditing();
+}
+
+void ViewProviderMesh::setColorPerFace(const App::PropertyColorList* prop)
+{
+    pcMatBinding->value = SoMaterialBinding::PER_FACE;
+    const std::vector<App::Color>& val = prop->getValues();
+    
     pcShapeMaterial->diffuseColor.setNum(val.size());
     SbColor* col = pcShapeMaterial->diffuseColor.startEditing();
 
@@ -706,8 +727,15 @@ void ViewProviderMesh::setupContextMenu(QMenu* menu, QObject* receiver, const ch
     Gui::ActionFunction* func = new Gui::ActionFunction(menu);
     QAction* act = menu->addAction(QObject::tr("Display components"));
     act->setCheckable(true);
-    act->setChecked(pcMatBinding->value.getValue() == SoMaterialBinding::PER_FACE);
+    act->setChecked(pcMatBinding->value.getValue() == SoMaterialBinding::PER_FACE &&
+                    highlightMode == "Component");
     func->toggle(act, boost::bind(&ViewProviderMesh::setHighlightedComponents, this, _1));
+
+    QAction* seg = menu->addAction(QObject::tr("Display segments"));
+    seg->setCheckable(true);
+    seg->setChecked(pcMatBinding->value.getValue() == SoMaterialBinding::PER_FACE &&
+                    highlightMode == "Segment");
+    func->toggle(seg, boost::bind(&ViewProviderMesh::setHighlightedSegments, this, _1));
 }
 
 bool ViewProviderMesh::setEdit(int ModNum)
@@ -1475,6 +1503,10 @@ void ViewProviderMesh::faceInfoCallback(void * ud, SoEventCallback * n)
                 view->removeGraphicsItem(*it);
                 delete *it;
             }
+
+            // See comment below
+            ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath("User parameter:BaseApp/Preferences/View");
+            hGrp->SetBool("ShowNaviCube", hGrp->GetBool("ShowNaviCube", true));
         }
     }
     else if (mbe->getButton() == SoMouseButtonEvent::BUTTON1 && mbe->getState() == SoButtonEvent::DOWN) {
@@ -1491,11 +1523,19 @@ void ViewProviderMesh::faceInfoCallback(void * ud, SoEventCallback * n)
         Gui::ViewProvider* vp = static_cast<Gui::ViewProvider*>(view->getViewProviderByPath(point->getPath()));
         if (!vp || !vp->getTypeId().isDerivedFrom(ViewProviderMesh::getClassTypeId()))
             return;
+
+        // FIXME: The Flag class doesn't work well (flickering) when the NaviCube is enabled.
+        // To avoid this the NaviCube is disabled for the time the flags are shown.
+        // When leaving this mode the NaviCube can be displayed again.
+        // For a proper solution it's best to move the Flag class to the QGraphicsView API.
+        view->setEnabledNaviCube(false);
+
         ViewProviderMesh* that = static_cast<ViewProviderMesh*>(vp);
         const SoDetail* detail = point->getDetail(that->getShapeNode());
         if (detail && detail->getTypeId() == SoFaceDetail::getClassTypeId()) {
             // get the boundary to the picked facet
-            unsigned long uFacet = ((SoFaceDetail*)detail)->getFaceIndex();
+            const SoFaceDetail* faceDetail = static_cast<const SoFaceDetail*>(detail);
+            unsigned long uFacet = faceDetail->getFaceIndex();
             that->faceInfo(uFacet);
             Gui::GLFlagWindow* flags = 0;
             std::list<Gui::GLGraphicsItem*> glItems = view->getGraphicsItemsOfType(Gui::GLFlagWindow::getClassTypeId());
@@ -1507,8 +1547,16 @@ void ViewProviderMesh::faceInfoCallback(void * ud, SoEventCallback * n)
                 flags = static_cast<Gui::GLFlagWindow*>(glItems.front());
             }
 
+            int point1 = static_cast<const SoPointDetail*>(faceDetail->getPoint(0))->getCoordinateIndex();
+            int point2 = static_cast<const SoPointDetail*>(faceDetail->getPoint(1))->getCoordinateIndex();
+            int point3 = static_cast<const SoPointDetail*>(faceDetail->getPoint(2))->getCoordinateIndex();
             Gui::Flag* flag = new Gui::Flag;
             flag->setText(QObject::tr("Index: %1").arg(uFacet));
+            QString toolTip = QString::fromLatin1("Facet index: %1\n"
+                                                  "Points: <%2, %3, %4>")
+                    .arg(uFacet)
+                    .arg(point1).arg(point2).arg(point3);
+            flag->setToolTip(toolTip);
             flag->setOrigin(point->getPoint());
             flags->addFlag(flag, Gui::FlagLayout::TopRight);
         }
@@ -1627,7 +1675,7 @@ void ViewProviderMesh::markPartCallback(void * ud, SoEventCallback * n)
 
 void ViewProviderMesh::faceInfo(unsigned long uFacet)
 {
-    Mesh::Feature* fea = reinterpret_cast<Mesh::Feature*>(this->getObject());
+    Mesh::Feature* fea = static_cast<Mesh::Feature*>(this->getObject());
     const MeshCore::MeshKernel& rKernel = fea->Mesh.getValue().getKernel();
     const MeshCore::MeshFacetArray& facets = rKernel.GetFacets();
     if (uFacet < facets.size()) {
@@ -1739,6 +1787,8 @@ void ViewProviderMesh::removeFacets(const std::vector<unsigned long>& facets)
 
     // get the colour property if there
     App::PropertyColorList* prop = getColorProperty();
+    bool ok = Coloring.getValue();
+
     if (prop && prop->getSize() == static_cast<int>(kernel->countPoints())) {
         std::vector<unsigned long> pointDegree;
         unsigned long invalid = kernel->getPointDegree(facets, pointDegree);
@@ -1759,11 +1809,32 @@ void ViewProviderMesh::removeFacets(const std::vector<unsigned long>& facets)
             prop->setValues(valid_colors);
         }
     }
+    else if (prop && prop->getSize() == static_cast<int>(kernel->countFacets())) {
+        // switch off coloring mode
+        Coloring.setValue(false);
+
+        std::vector<bool> validFacets(kernel->countFacets(), true);
+        for (auto it : facets)
+            validFacets[it] = false;
+
+        const std::vector<App::Color>& colors = prop->getValues();
+        std::vector<App::Color> valid_colors;
+        valid_colors.reserve(colors.size());
+        std::size_t numColors = colors.size();
+        for (std::size_t index = 0; index < numColors; index++) {
+            if (validFacets[index])
+                valid_colors.push_back(colors[index]);
+        }
+
+        prop->setValues(valid_colors);
+    }
 
     //Remove the facets from the mesh and open a transaction object for the undo/redo stuff
     kernel->deleteFacets(facets);
     meshProp.finishEditing();
     pcObject->purgeTouched();
+
+    Coloring.setValue(ok);
 }
 
 void ViewProviderMesh::selectFacet(unsigned long facet)
@@ -1985,9 +2056,11 @@ void ViewProviderMesh::unhighlightSelection()
 void ViewProviderMesh::setHighlightedComponents(bool on)
 {
     if (on) {
+        highlightMode = "Component";
         highlightComponents();
     }
     else {
+        highlightMode.clear();
         unhighlightSelection();
     }
 }
@@ -2013,6 +2086,34 @@ void ViewProviderMesh::highlightComponents()
         }
     }
     pcShapeMaterial->diffuseColor.finishEditing();
+}
+
+void ViewProviderMesh::setHighlightedSegments(bool on)
+{
+    if (on) {
+        highlightMode = "Segment";
+        highlightSegments();
+    }
+    else {
+        highlightMode.clear();
+        unhighlightSelection();
+    }
+}
+
+void ViewProviderMesh::highlightSegments()
+{
+    std::vector<App::Color> colors;
+    const Mesh::MeshObject& rMesh = static_cast<Mesh::Feature*>(pcObject)->Mesh.getValue();
+    unsigned long numSegm = rMesh.countSegments();
+    colors.resize(numSegm, this->ShapeColor.getValue());
+
+    for (unsigned long i=0; i<numSegm; i++) {
+        App::Color col;
+        if (col.fromHexString(rMesh.getSegment(i).getColor()))
+            colors[i] = col;
+    }
+
+    highlightSegments(colors);
 }
 
 void ViewProviderMesh::highlightSegments(const std::vector<App::Color>& colors)
@@ -2044,6 +2145,14 @@ void ViewProviderMesh::highlightSegments(const std::vector<App::Color>& colors)
         float fBlu = colors[0].b;
         pcShapeMaterial->diffuseColor.setValue(fRed,fGrn,fBlu);
     }
+}
+
+PyObject* ViewProviderMesh::getPyObject()
+{
+    if (!pyViewObject)
+        pyViewObject = new ViewProviderMeshPy(this);
+    pyViewObject->IncRef();
+    return pyViewObject;
 }
 
 // ------------------------------------------------------

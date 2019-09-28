@@ -170,7 +170,8 @@ void TaskProjGroup::rotateButtonClicked(void)
             multiView->spinCCW();
         }
         setUiPrimary();
-        Gui::Command::updateActive();
+
+        multiView->recomputeFeature(true);
     }
 }
 
@@ -211,6 +212,8 @@ void TaskProjGroup::projectionTypeChanged(int index)
 
     // Update checkboxes so checked state matches the drawing
     setupViewCheckboxes();
+
+    multiView->recomputeFeature(true);
 
 }
 
@@ -256,8 +259,7 @@ void TaskProjGroup::scaleTypeChanged(int index)
         return;
     }
 
-    multiView->recomputeFeature();
-    Gui::Command::updateActive();
+    multiView->recomputeFeature(true);
 }
 
 std::pair<int, int> TaskProjGroup::nearestFraction(const double val, const long int maxDenom) const
@@ -375,7 +377,6 @@ void TaskProjGroup::scaleManuallyChanged(int i)
     Gui::Command::doCommand(Gui::Command::Doc, "App.activeDocument().%s.Scale = %f", multiView->getNameInDocument()
                                                                                      , scale);
     multiView->recomputeFeature();  //just a repaint.  multiView is already marked for recompute by changed to Scale
-    Gui::Command::updateActive();
 }
 
 void TaskProjGroup::changeEvent(QEvent *e)
@@ -465,7 +466,8 @@ bool TaskProjGroup::accept()
     Gui::Document* doc = Gui::Application::Instance->getDocument(multiView->getDocument());
     if (!doc) return false;
 
-    if (!getCreateMode())  {    //this is an edit session, end the transaction
+    // if (!getCreateMode())      //this is an edit session, end the transaction
+    {
         Gui::Command::commitCommand();
     }
     //Gui::Command::updateActive();     //no chain of updates here
@@ -479,6 +481,7 @@ bool TaskProjGroup::reject()
     Gui::Document* doc = Gui::Application::Instance->getDocument(multiView->getDocument());
     if (!doc) return false;
 
+#if 0
     if (getCreateMode()) {
         std::string multiViewName = multiView->getNameInDocument();
         std::string PageName = multiView->findParentPage()->getNameInDocument();
@@ -500,9 +503,12 @@ bool TaskProjGroup::reject()
             Base::Console().Log("TaskProjGroup: Edit mode - NO command is active\n");
         }
 
-        Gui::Command::updateActive();
         Gui::Command::doCommand(Gui::Command::Gui,"Gui.ActiveDocument.resetEdit()");
     }
+#endif
+
+    Gui::Command::abortCommand();
+    Gui::Command::runCommand(Gui::Command::Gui,"Gui.ActiveDocument.resetEdit()");
     return false;
 }
 
@@ -538,9 +544,10 @@ void TaskDlgProjGroup::setCreateMode(bool b)
 //==== calls from the TaskView ===============================================================
 void TaskDlgProjGroup::open()
 {
-    if (!widget->getCreateMode())  {    //this is an edit session, start a transaction
-        Gui::Command::openCommand("Edit Projection Group");
-    }
+    // if (!widget->getCreateMode())  {    //this is an edit session, start a transaction
+    //     Gui::Command::openCommand("Edit Projection Group");
+    // }
+    App::GetApplication().setActiveTransaction("Edit Projection Group", true);
 }
 
 void TaskDlgProjGroup::clicked(int)

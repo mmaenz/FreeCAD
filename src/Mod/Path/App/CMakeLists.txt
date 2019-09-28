@@ -43,6 +43,7 @@ SET(Python_SRCS
     PathPy.xml
     PathPyImp.cpp
     ToolPy.xml
+    ToolPyImp.cpp
     TooltablePy.xml
     TooltablePyImp.cpp
     FeaturePathCompoundPy.xml
@@ -65,6 +66,8 @@ SET(Path_SRCS
     Command.h
     Path.cpp
     Path.h
+    Tool.cpp
+    Tool.h
     Tooltable.cpp
     Tooltable.h
     PropertyPath.cpp
@@ -115,6 +118,13 @@ SOURCE_GROUP("Module" FILES ${Mod_SRCS})
 
 add_library(Path SHARED ${Path_SRCS})
 target_link_libraries(Path ${Path_LIBS})
+
+if(FREECAD_USE_PCH)
+    add_definitions(-D_PreComp_)
+    GET_MSVC_PRECOMPILED_SOURCE("PreCompiled.cpp" Path_CPP_SRCS ${Path_SRCS})
+    ADD_MSVC_PRECOMPILED_HEADER(Path PreCompiled.h PreCompiled.cpp Path_CPP_SRCS)
+endif(FREECAD_USE_PCH)
+
 
 SET_BIN_DIR(Path Path /Mod/Path)
 SET_PYTHON_PREFIX_SUFFIX(Path)

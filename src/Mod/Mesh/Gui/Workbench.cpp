@@ -195,7 +195,8 @@ Gui::MenuItem* Workbench::setupMenuBar() const
              << "Mesh_PolyTrim"
            //<< "Mesh_PolySegm"
              << "Mesh_TrimByPlane"
-             << "Mesh_SectionByPlane";
+             << "Mesh_SectionByPlane"
+             << "Mesh_CrossSections";
 
     mesh->setCommand("&Meshes");
     *mesh << "Mesh_Import"
@@ -213,6 +214,7 @@ Gui::MenuItem* Workbench::setupMenuBar() const
           << "Mesh_RemoveComponents"
           << "Mesh_RemoveCompByHand"
           << "Mesh_Segmentation"
+          << "Mesh_SegmentationBestFit"
           << "Separator"
           << "Mesh_Smoothing"
           << "Mesh_Scale"

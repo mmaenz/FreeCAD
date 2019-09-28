@@ -26,6 +26,55 @@
 
 using namespace Base;
 
+ViewProjMethod::ViewProjMethod()
+  : hasTransform(false)
+{
+}
+
+/*! Calculate the composed projection matrix which is a product of
+ * projection matrix multiplied with input transformation matrix.
+ */
+Matrix4D ViewProjMethod::getComposedProjectionMatrix (void) const
+{
+    Matrix4D mat = getProjectionMatrix();
+
+    // Compose the object transform, if defined
+    if (hasTransform) {
+        mat = mat * transform;
+    }
+
+    return mat;
+}
+
+/*!
+ * \brief This method applies an additional transformation to the input points
+ * passed with the () operator.
+ * \param mat
+ */
+void ViewProjMethod::setTransform(const Base::Matrix4D& mat)
+{
+    transform = mat;
+    hasTransform = (mat != Base::Matrix4D());
+}
+
+void ViewProjMethod::transformInput(const Base::Vector3f& src, Base::Vector3f& dst) const
+{
+    dst = src;
+    if (hasTransform) {
+        transform.multVec(dst, dst);
+    }
+}
+
+void ViewProjMethod::transformInput(const Base::Vector3d& src, Base::Vector3d& dst) const
+{
+    dst = src;
+    if (hasTransform) {
+        transform.multVec(dst, dst);
+    }
+}
+
+//-----------------------------------------------------------------------------
+
 ViewProjMatrix::ViewProjMatrix (const Matrix4D &rclMtx)
   : _clMtx(rclMtx)
 {
@@ -54,6 +103,18 @@ ViewProjMatrix::~ViewProjMatrix()
 {
 }
 
+Matrix4D ViewProjMatrix::getProjectionMatrix (void) const
+{
+    // Return the same matrix as passed to the constructor
+    Matrix4D mat(_clMtx);
+    if (isOrthographic) {
+        mat.move(-0.5, -0.5, -0.5);
+        mat.scale(2.0, 2.0, 2.0);
+    }
+
+    return mat;
+}
+
 template<typename Vec>
 void perspectiveTransform(const Base::Matrix4D& mat, Vec& pnt)
 {
@@ -67,8 +128,11 @@ void perspectiveTransform(const Base::Matrix4D& mat, Vec& pnt)
     pnt /= w;
 }
 
-Vector3f ViewProjMatrix::operator()(const Vector3f& src) const
+Vector3f ViewProjMatrix::operator()(const Vector3f& inp) const
 {
+    Vector3f src;
+    transformInput(inp, src);
+
     Vector3f dst;
     if (!isOrthographic) {
         dst = src;
@@ -82,8 +146,11 @@ Vector3f ViewProjMatrix::operator()(const Vector3f& src) const
     return dst;
 }
 
-Vector3d ViewProjMatrix::operator()(const Vector3d& src) const
+Vector3d ViewProjMatrix::operator()(const Vector3d& inp) const
 {
+    Vector3d src;
+    transformInput(inp, src);
+
     Vector3d dst;
     if (!isOrthographic) {
         dst = src;

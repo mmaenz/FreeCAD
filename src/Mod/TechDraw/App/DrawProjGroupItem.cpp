@@ -29,8 +29,10 @@
 #include <gp_Ax2.hxx>
 #include <gp_Ax3.hxx>
 #include <gp_Trsf.hxx>
+
+#include <App/Application.h>
+#include <App/DocumentObject.h>
 #include <Base/Console.h>
-#include <Base/Writer.h>
 
 #include "GeometryObject.h"
 #include "DrawUtil.h"
@@ -72,6 +74,10 @@ DrawProjGroupItem::DrawProjGroupItem(void)
     ScaleType.setStatus(App::Property::ReadOnly,true);
 }
 
+DrawProjGroupItem::~DrawProjGroupItem()
+{
+}
+
 short DrawProjGroupItem::mustExecute() const
 {
     short result = 0;
@@ -91,11 +97,19 @@ short DrawProjGroupItem::mustExecute() const
 void DrawProjGroupItem::onChanged(const App::Property *prop)
 {
     TechDraw::DrawViewPart::onChanged(prop);
-
 }
 
-DrawProjGroupItem::~DrawProjGroupItem()
+bool DrawProjGroupItem::isLocked(void) const
 {
+    bool isLocked = DrawView::isLocked();
+    if (isAnchor()) {                             //Anchor view is always locked to DPG
+        return true;
+    }
+    DrawProjGroup* parent = getPGroup();
+    if (parent != nullptr) {
+        isLocked = isLocked || parent->LockPosition.getValue();
+    }
+    return isLocked;
 }
 
 App::DocumentObjectExecReturn *DrawProjGroupItem::execute(void)
@@ -106,26 +120,31 @@ App::DocumentObjectExecReturn *DrawProjGroupItem::execute(void)
     }
 
     App::DocumentObjectExecReturn * ret = DrawViewPart::execute();
-    delete ret;
-
-    autoPosition();
-    requestPaint();
+    if (ret != nullptr) {
+        return ret;
+    } else {
+        autoPosition();
+        delete ret;
+    }
     return App::DocumentObject::StdReturn;
 }
 
 void DrawProjGroupItem::autoPosition()
 {
+//    Base::Console().Message("DPGI::autoPosition(%s)\n",getNameInDocument());
     auto pgroup = getPGroup();
     Base::Vector3d newPos;
-    if ((pgroup != nullptr) && 
-        (pgroup->AutoDistribute.getValue()) &&
-        (!LockPosition.getValue())) {
-        newPos = pgroup->getXYPosition(Type.getValueAsString());
-        X.setValue(newPos.x);
-        Y.setValue(newPos.y);
+    if (pgroup != nullptr) {
+        if (pgroup->AutoDistribute.getValue()) {
+            if (!LockPosition.getValue()) {
+                newPos = pgroup->getXYPosition(Type.getValueAsString());
+                X.setValue(newPos.x);
+                Y.setValue(newPos.y);
+                requestPaint();
+                purgeTouched();               //prevents "still touched after recompute" message
+            }
+        }
     }
-    requestPaint();
-    purgeTouched();
 }
 
 void DrawProjGroupItem::onDocumentRestored()
@@ -149,7 +168,7 @@ DrawProjGroup* DrawProjGroupItem::getPGroup() const
     return result;
 }
 
-bool DrawProjGroupItem::isAnchor(void)
+bool DrawProjGroupItem::isAnchor(void) const
 {
     bool result = false;
     auto group = getPGroup();
@@ -189,13 +208,12 @@ gp_Ax2 DrawProjGroupItem::getViewAxis(const Base::Vector3d& pt,
     catch (Standard_Failure& e4) {
         Base::Console().Message("PROBLEM - DPGI (%s) failed to create viewAxis: %s **\n",
                                 getNameInDocument(),e4.GetMessageString());
-        return TechDrawGeometry::getViewAxis(pt,axis,false);
+        return TechDraw::getViewAxis(pt,axis,false);
     }
 
     return viewAxis;
 }
 
-//obs??
 //get the angle between the current RotationVector vector and the original X dir angle
 double DrawProjGroupItem::getRotateAngle()
 {
@@ -207,13 +225,12 @@ double DrawProjGroupItem::getRotateAngle()
     na.Normalize();
     Base::Vector3d org(0.0,0.0,0.0);
 
-    viewAxis = TechDrawGeometry::getViewAxis(org,na,true);        //default orientation
+    viewAxis = TechDraw::getViewAxis(org,na,true);        //default orientation
 
     gp_Dir gxDir = viewAxis.XDirection();
     Base::Vector3d origX(gxDir.X(),gxDir.Y(),gxDir.Z());
     origX.Normalize();
-    double dot = fabs(origX.Dot(nx));  
-    double angle = acos(dot);
+    double angle = origX.GetAngle(nx);
 
     Base::Vector3d rotAxis = origX.Cross(nx);
     if (rotAxis == Direction.getValue()) {
@@ -235,7 +252,6 @@ double DrawProjGroupItem::getScale(void) const
     }
     return result;
 }
-
 
 void DrawProjGroupItem::unsetupObject()
 {

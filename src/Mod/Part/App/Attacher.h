@@ -203,7 +203,7 @@ struct SuggestResult{
      */
     refTypeString references_Types;
 
-    Base::Exception error;
+    Base::RuntimeError error;
 };
 
 
@@ -456,6 +456,9 @@ public:
     AttachEnginePoint();
     virtual AttachEnginePoint* copy() const;
     virtual Base::Placement calculateAttachedPlacement(Base::Placement origPlacement) const;
+
+private:
+    gp_Pnt getProximityPoint(eMapMode mode, const TopoDS_Shape& s1, const TopoDS_Shape& s2) const;
 };
 
 //====================================================================

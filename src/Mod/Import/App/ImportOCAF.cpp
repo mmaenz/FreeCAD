@@ -54,7 +54,9 @@
 # include <XCAFDoc_ShapeTool.hxx>
 # include <XCAFDoc_ColorTool.hxx>
 # include <XCAFDoc_Location.hxx>
+# include <XCAFDoc_GraphNode.hxx>
 # include <TDF_Label.hxx>
+# include <TDF_Tool.hxx>
 # include <TDF_LabelSequence.hxx>
 # include <TDF_ChildIterator.hxx>
 # include <TDataStd_Name.hxx>
@@ -81,11 +83,14 @@
 # endif
 #endif
 
+#include <boost/algorithm/string.hpp>
+#include <Base/Parameter.h>
 #include <Base/Console.h>
 #include <App/Application.h>
 #include <App/Document.h>
 #include <App/DocumentObjectPy.h>
 #include <App/Part.h>
+#include <App/Link.h>
 #include <Mod/Part/App/PartFeature.h>
 #include <Mod/Part/App/FeatureCompound.h>
 #include "ImportOCAF.h"
@@ -102,10 +107,7 @@
 #include <tbb/task_group.h>
 #endif
 
-
-
 using namespace Import;
-
 
 #define OCAF_KEEP_PLACEMENT
 
@@ -280,7 +282,7 @@ void ImportOCAF::loadShapes(const TDF_Label& label, const TopLoc_Location& loc,
 }
 
 void ImportOCAF::createShape(const TDF_Label& label, const TopLoc_Location& loc, const std::string& name,
-                             std::vector<App::DocumentObject*>& lValue, bool merge)
+                             std::vector<App::DocumentObject*>& lValue, bool mergeShape)
 {
     const TopoDS_Shape& aShape = aShapeTool->GetShape(label);
 #ifdef HAVE_TBB
@@ -288,15 +290,13 @@ void ImportOCAF::createShape(const TDF_Label& label, const TopLoc_Location& loc,
     task_group g;
 #endif
 
-    App::Color color(0.8f,0.8f,0.8f);
-    std::vector<App::Color> colors;
     if (!aShape.IsNull() && aShape.ShapeType() == TopAbs_COMPOUND) {
         TopExp_Explorer xp;
         int ctSolids = 0, ctShells = 0, ctVertices = 0, ctEdges = 0;
         std::vector<App::DocumentObject *> localValue;
         App::Part *pcPart = NULL;
 
-        if (merge) {
+        if (mergeShape) {
 
             // We should do that only if there is more than a single shape inside
             // Computing Compounds takes time
@@ -376,6 +376,8 @@ void ImportOCAF::createShape(const TDF_Label& label, const TopLoc_Location& loc,
                     part->Shape.setValue(comp);
                 part->Label.setValue(name);
                 lValue.push_back(part);
+
+                loadColors(part, aShape);
             }
         }
         else {
@@ -387,7 +389,7 @@ void ImportOCAF::createShape(const TDF_Label& label, const TopLoc_Location& loc,
             }
         }
 
-        if (!localValue.empty() && !merge) {
+        if (!localValue.empty() && !mergeShape) {
             pcPart = static_cast<App::Part*>(doc->addObject("App::Part",name.c_str()));
             pcPart->Label.setValue(name);
 
@@ -433,6 +435,11 @@ void ImportOCAF::createShape(const TopoDS_Shape& aShape, const TopLoc_Location& 
     part->Label.setValue(name);
     lvalue.push_back(part);
 
+    loadColors(part, aShape);
+}
+
+void ImportOCAF::loadColors(Part::Feature* part, const TopoDS_Shape& aShape)
+{
     Quantity_Color aColor;
     App::Color color(0.8f,0.8f,0.8f);
     if (aColorTool->GetColor(aShape, XCAFDoc_ColorGen, aColor) ||

@@ -1,6 +1,6 @@
 # ***************************************************************************
 # *                                                                         *
-# *   Copyright (c) 2017 - Markus Hovorka <m.hovorka@live.de>               *
+# *   Copyright (c) 2017 Markus Hovorka <m.hovorka@live.de>                 *
 # *                                                                         *
 # *   This program is free software; you can redistribute it and/or modify  *
 # *   it under the terms of the GNU Lesser General Public License (LGPL)    *
@@ -20,18 +20,20 @@
 # *                                                                         *
 # ***************************************************************************
 
-
-__title__ = "view provider for constraint flow velocity object"
+__title__ = "FreeCAD FEM constraint flow velocity ViewProvider for the document object"
 __author__ = "Markus Hovorka, Bernd Hahnebach"
 __url__ = "http://www.freecadweb.org"
 
+## @package ViewProviderFemConstraintFlowVelocity
+#  \ingroup FEM
+#  \brief FreeCAD FEM view provider for constraint flow velocity object
 
 import FreeCAD
 import FreeCADGui
 from . import ViewProviderFemConstraint
 
 # for the panel
-import femtools.femutils as FemUtils
+import femtools.femutils as femutils
 from FreeCAD import Units
 from . import FemSelectionWidgets
 
@@ -63,16 +65,15 @@ class _TaskPanel(object):
         self._refWidget = FemSelectionWidgets.BoundarySelector()
         self._refWidget.setReferences(obj.References)
         self._paramWidget = FreeCADGui.PySideUic.loadUi(
-            FreeCAD.getHomePath() + "Mod/Fem/Resources/ui/FlowVelocity.ui")
+            FreeCAD.getHomePath() + "Mod/Fem/Resources/ui/FlowVelocity.ui"
+        )
         self._initParamWidget()
         self.form = [self._refWidget, self._paramWidget]
-        analysis = FemUtils.findAnalysisOfMember(obj)
-        self._mesh = FemUtils.getSingleMember(analysis, "Fem::FemMeshObject")
+        analysis = femutils.findAnalysisOfMember(obj)
+        self._mesh = femutils.get_single_member(analysis, "Fem::FemMeshObject")
         self._part = None
-        if hasattr(self._mesh, "Part"):  # Geometry of Gmesh mesh obj
-            self._part = self._mesh.Part
-        elif hasattr(self._mesh, "Shape"):  # Geometry of Netgen mesh obj
-            self._part = self._mesh.Shape
+        if self._mesh is not None:
+            self._part = femutils.get_part_to_mesh(self._mesh)
         self._partVisible = None
         self._meshVisible = None
 

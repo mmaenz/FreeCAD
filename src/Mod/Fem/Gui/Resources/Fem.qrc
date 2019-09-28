@@ -52,6 +52,7 @@
         <file>icons/fem-material.svg</file>
         <file>icons/fem-material-fluid.svg</file>
         <file>icons/fem-material-nonlinear.svg</file>
+        <file>icons/fem-material-reinforced.svg</file>
         <file>icons/fem-post-data-pipline.svg</file>
         <file>icons/fem-post-filter-clip-region.svg</file>
         <file>icons/fem-post-filter-clip-scalar.svg</file>
@@ -112,5 +113,7 @@
         <file>translations/Fem_id.qm</file>
         <file>translations/Fem_lt.qm</file>
         <file>translations/Fem_val-ES.qm</file>
+        <file>translations/Fem_ar.qm</file>
+        <file>translations/Fem_vi.qm</file>
     </qresource>
 </RCC>

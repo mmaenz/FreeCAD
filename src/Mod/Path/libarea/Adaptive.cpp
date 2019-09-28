@@ -35,7 +35,7 @@ namespace AdaptivePath
 {
 using namespace ClipperLib;
 using namespace std;
-#define SAME_POINT_TOL_SQRD_SCALED 16.0
+#define SAME_POINT_TOL_SQRD_SCALED 4.0
 #define UNUSED(expr) (void)(expr)
 
 //*****************************************
@@ -155,6 +155,10 @@ class BoundBox
   public:
 	BoundBox()
 	{
+		minX = 0;
+		maxX = 0;
+		minY = 0;
+		maxY = 0;
 	}
 
 	// generic: first point
@@ -407,10 +411,17 @@ void CleanPath(const Path &inp, Path &outpt, double tolerance)
 	long index;
 	for (long i = 0; i < size; i++)
 	{
-		index = clpSegmentIndex + i;
+		index = static_cast<long>(clpSegmentIndex + i);
 		if (index >= size) index -= size;
 		outpt.push_back(tmp.at(index));
 	}
+
+
+	if(DistanceSqrd(outpt.front(),inp.front()) > SAME_POINT_TOL_SQRD_SCALED)
+		outpt.insert(outpt.begin(), inp.front());
+
+	if(DistanceSqrd(outpt.back(),inp.back()) > SAME_POINT_TOL_SQRD_SCALED)
+		outpt.push_back( inp.back());
 
 }
 
@@ -609,7 +620,7 @@ void SmoothPaths(Paths &paths, double stepSize, long pointCount, long iterations
 				points.push_back(pair<size_t /*path index*/, IntPoint>(i, pt));
 				continue;
 			}
-			const auto &back=points.back();
+			const auto back=points.back();
 			const IntPoint & lastPt = back.second;
 
 
@@ -842,6 +853,7 @@ class PerfCounter
 		name = p_name;
 		count = 0;
 		running = false;
+		start_ticks = 0;
 		total_ticks = 0;
 	}
 	inline void Start()
@@ -1122,14 +1134,14 @@ class EngagePoint
   public:
 	struct EngageState
 	{
-		size_t currentPathIndex;
-		size_t currentSegmentIndex;
+		size_t currentPathIndex = 0;
+		size_t currentSegmentIndex = 0;
 		double segmentPos = 0;
 		double totalDistance = 0;
 		double currentPathLength = 0;
 		int passes = 0;
 
-		double metric; // engage point metric
+		double metric = 0; // engage point metric
 
 		bool operator<(const EngageState &other) const
 		{
@@ -1594,7 +1606,7 @@ double Adaptive2d::CalcCutArea(Clipper &clip, const IntPoint &c1, const IntPoint
 		Perf_CalcCutAreaClip.Start();
 		// old way of calculating cut area based on polygon clipping
 		// used in case when there are multiple intersections of tool with cleared poly (very rare case, but important)
-		// 1. find differene between old and new tool shape
+		// 1. find difference between old and new tool shape
 		Path oldTool;
 		Path newTool;
 		TranslatePath(toolGeometry, oldTool, c1);
@@ -1664,11 +1676,14 @@ std::list<AdaptiveOutput> Adaptive2d::Execute(const DPaths &stockPaths, const DP
 		tolerance = 0.2;
 
 	scaleFactor = RESOLUTION_FACTOR / tolerance;
+	long maxScaleFactor = toolDiameter<1.0 ? 10000: 1000;
+
 	if (stepOverFactor * toolDiameter < 1.0)
 		scaleFactor *= 1.0 / (stepOverFactor * toolDiameter);
-	if (scaleFactor > 1000)
-		scaleFactor = 1000;
 
+
+	if (scaleFactor > maxScaleFactor )
+		scaleFactor = maxScaleFactor;
 	//scaleFactor = round(scaleFactor);
 
 	current_region=0;

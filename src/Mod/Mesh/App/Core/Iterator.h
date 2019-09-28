@@ -43,6 +43,7 @@ class MeshHelpEdge;
  * The MeshFacetIterator allows to iterate over the facets that
  * hold the topology of the mesh and provides access to their
  * geometric information.
+ * \note This class is not thread-safe.
  */
 class MeshFacetIterator
 {
@@ -167,6 +168,7 @@ protected:
 /**
  * The MeshPointIterator allows to iterate over the vertices of the mesh and provides access to their
  * geometric information.
+ * \note This class is not thread-safe.
  */
 class MeshExport MeshPointIterator
 {
@@ -381,8 +383,6 @@ inline MeshFacetIterator& MeshFacetIterator::operator = (const MeshFacetIterator
   _clIter  = rpI._clIter;
   _bApply = rpI._bApply;
   _clTrf = rpI._clTrf;
-  // dirty flat copy of reference
-  memcpy((void*)&_rclMesh, &rpI._rclMesh, sizeof(MeshKernel*));
   return *this;
 }
 
@@ -469,8 +469,6 @@ inline MeshPointIterator& MeshPointIterator::operator = (const MeshPointIterator
   _clIter  = rpI._clIter;
   _bApply = rpI._bApply;
   _clTrf = rpI._clTrf;
-  // dirty flat copy of reference
-  memcpy((void*)&_rclMesh, &rpI._rclMesh, sizeof(MeshKernel*));
   return *this;
 }
 

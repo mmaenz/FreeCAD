@@ -46,7 +46,7 @@
 using namespace std;
 using namespace RobotGui;
 
-DEF_STD_CMD_A(CmdRobotSetHomePos);
+DEF_STD_CMD_A(CmdRobotSetHomePos)
 
 CmdRobotSetHomePos::CmdRobotSetHomePos()
 	:Command("Robot_SetHomePos")
@@ -95,7 +95,7 @@ bool CmdRobotSetHomePos::isActive(void)
 
 
 // #####################################################################################################
-DEF_STD_CMD_A(CmdRobotRestoreHomePos);
+DEF_STD_CMD_A(CmdRobotRestoreHomePos)
 
 CmdRobotRestoreHomePos::CmdRobotRestoreHomePos()
 	:Command("Robot_RestoreHomePos")
@@ -149,7 +149,7 @@ bool CmdRobotRestoreHomePos::isActive(void)
 
 
 // #####################################################################################################
-DEF_STD_CMD_A(CmdRobotConstraintAxle);
+DEF_STD_CMD_A(CmdRobotConstraintAxle)
 
 CmdRobotConstraintAxle::CmdRobotConstraintAxle()
 	:Command("Robot_Create")
@@ -190,7 +190,7 @@ bool CmdRobotConstraintAxle::isActive(void)
 
 // #####################################################################################################
 
-DEF_STD_CMD_A(CmdRobotSimulate);
+DEF_STD_CMD_A(CmdRobotSimulate)
 
 CmdRobotSimulate::CmdRobotSimulate()
 	:Command("Robot_Simulate")
@@ -228,7 +228,7 @@ void CmdRobotSimulate::activated(int)
 
     if(pcTrajectoryObject->Trajectory.getValue().getSize() < 2){
         QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Trajectory not valid"),
-            QObject::tr("You need at least two way points in a trajectory to simulate."));
+            QObject::tr("You need at least two waypoints in a trajectory to simulate."));
         return;
     }
 

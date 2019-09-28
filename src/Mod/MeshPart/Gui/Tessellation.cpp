@@ -62,7 +62,20 @@ Tessellation::Tessellation(QWidget* parent)
     connect(buttonGroup, SIGNAL(buttonClicked(int)),
             this, SLOT(meshingMethod(int)));
 
+    ParameterGrp::handle handle = App::GetApplication().GetParameterGroupByPath
+        ("User parameter:BaseApp/Preferences/Mod/Mesh/Meshing/Standard");
+    double value = ui->spinSurfaceDeviation->value().getValue();
+    value = handle->GetFloat("LinearDeflection", value);
+    double angle = ui->spinAngularDeviation->value().getValue();
+    angle = handle->GetFloat("AngularDeflection", angle);
+    bool relative = ui->relativeDeviation->isChecked();
+    relative = handle->GetBool("RelativeLinearDeflection", relative);
+    ui->relativeDeviation->setChecked(relative);
+
     ui->spinSurfaceDeviation->setMaximum(INT_MAX);
+    ui->spinSurfaceDeviation->setValue(value);
+    ui->spinAngularDeviation->setValue(angle);
+
     ui->spinMaximumEdgeLength->setRange(0, INT_MAX);
 
     // set the standard method
@@ -240,6 +253,18 @@ bool Tessellation::accept()
 
         int method = buttonGroup->checkedId();
 
+        // Save parameters
+        if (method == 0) {
+            ParameterGrp::handle handle = App::GetApplication().GetParameterGroupByPath
+                ("User parameter:BaseApp/Preferences/Mod/Mesh/Meshing/Standard");
+            double value = ui->spinSurfaceDeviation->value().getValue();
+            handle->SetFloat("LinearDeflection", value);
+            double angle = ui->spinAngularDeviation->value().getValue();
+            handle->SetFloat("AngularDeflection", angle);
+            bool relative = ui->relativeDeviation->isChecked();
+            handle->SetBool("RelativeLinearDeflection", relative);
+        }
+
         activeDoc->openTransaction("Meshing");
         QList<QTreeWidgetItem *> items = ui->treeWidget->selectedItems();
         std::vector<Part::Feature*> shapes = Gui::Selection().getObjectsOfType<Part::Feature>();
@@ -273,7 +298,6 @@ bool Tessellation::accept()
                     "__shape__.Placement=__part__.getGlobalPlacement()\n"
                     "__mesh__.Mesh=MeshPart.meshFromShape(%3)\n"
                     "__mesh__.Label=\"%4 (Meshed)\"\n"
-                    "__mesh__.ViewObject.CreaseAngle=25.0\n"
                     "del __doc__, __mesh__, __part__, __shape__\n")
                     .arg(this->document)
                     .arg(shape)
@@ -292,7 +316,6 @@ bool Tessellation::accept()
                     "__shape__.Placement=__part__.getGlobalPlacement()\n"
                     "__mesh__.Mesh=MeshPart.meshFromShape(Shape=__shape__,MaxLength=%3)\n"
                     "__mesh__.Label=\"%4 (Meshed)\"\n"
-                    "__mesh__.ViewObject.CreaseAngle=25.0\n"
                     "del __doc__, __mesh__, __part__, __shape__\n")
                     .arg(this->document)
                     .arg(shape)
@@ -317,7 +340,6 @@ bool Tessellation::accept()
                         "__mesh__.Mesh=MeshPart.meshFromShape(Shape=__shape__,"
                         "Fineness=%3,SecondOrder=%4,Optimize=%5,AllowQuad=%6)\n"
                         "__mesh__.Label=\"%7 (Meshed)\"\n"
-                        "__mesh__.ViewObject.CreaseAngle=25.0\n"
                         "del __doc__, __mesh__, __part__, __shape__\n")
                         .arg(this->document)
                         .arg(shape)
@@ -337,7 +359,6 @@ bool Tessellation::accept()
                         "__mesh__.Mesh=MeshPart.meshFromShape(Shape=__shape__,"
                         "GrowthRate=%3,SegPerEdge=%4,SegPerRadius=%5,SecondOrder=%6,Optimize=%7,AllowQuad=%8)\n"
                         "__mesh__.Label=\"%9 (Meshed)\"\n"
-                        "__mesh__.ViewObject.CreaseAngle=25.0\n"
                         "del __doc__, __mesh__, __part__, __shape__\n")
                         .arg(this->document)
                         .arg(shape)

@@ -85,6 +85,7 @@
 #include "SoFCDB.h"
 #include "PythonConsolePy.h"
 #include "PythonDebugger.h"
+#include "MDIViewPy.h"
 #include "View3DPy.h"
 #include "DlgOnlineHelpImp.h"
 #include "SpaceballEvent.h"
@@ -93,6 +94,7 @@
 #include "TransactionObject.h"
 #include "FileDialog.h"
 
+#include "TextDocumentEditorView.h"
 #include "SplitView3DInventor.h"
 #include "View3DInventor.h"
 #include "ViewProvider.h"
@@ -119,6 +121,9 @@
 #include "ViewProviderMaterialObject.h"
 #include "ViewProviderTextDocument.h"
 #include "ViewProviderGroupExtension.h"
+#include "ViewProviderLink.h"
+#include "LinkViewPy.h"
+#include "AxisOriginPy.h"
 
 #include "Language/Translator.h"
 #include "TaskView/TaskView.h"
@@ -142,6 +147,7 @@ struct ApplicationP
 {
     ApplicationP() :
     activeDocument(0L),
+    editDocument(0L),
     isClosing(false),
     startingUp(true)
     {
@@ -158,6 +164,7 @@ struct ApplicationP
     std::map<const App::Document*, Gui::Document*> documents;
     /// Active document
     Gui::Document*   activeDocument;
+    Gui::Document*  editDocument;
     MacroManager*  macroMngr;
     /// List of all registered views
     std::list<Gui::BaseView*> passive;
@@ -286,11 +293,12 @@ Application::Application(bool GUIenabled)
 {
     //App::GetApplication().Attach(this);
     if (GUIenabled) {
-        App::GetApplication().signalNewDocument.connect(boost::bind(&Gui::Application::slotNewDocument, this, _1));
+        App::GetApplication().signalNewDocument.connect(boost::bind(&Gui::Application::slotNewDocument, this, _1, _2));
         App::GetApplication().signalDeleteDocument.connect(boost::bind(&Gui::Application::slotDeleteDocument, this, _1));
         App::GetApplication().signalRenameDocument.connect(boost::bind(&Gui::Application::slotRenameDocument, this, _1));
         App::GetApplication().signalActiveDocument.connect(boost::bind(&Gui::Application::slotActiveDocument, this, _1));
         App::GetApplication().signalRelabelDocument.connect(boost::bind(&Gui::Application::slotRelabelDocument, this, _1));
+        App::GetApplication().signalShowHidden.connect(boost::bind(&Gui::Application::slotShowHidden, this, _1));
 
 
         // install the last active language
@@ -398,6 +406,9 @@ Application::Application(bool GUIenabled)
         Gui::TaskView::ControlPy::init_type();
         Py::Module(module).setAttr(std::string("Control"),
             Py::Object(Gui::TaskView::ControlPy::getInstance(), true));
+
+        Base::Interpreter().addType(&LinkViewPy::Type,module,"LinkView");
+        Base::Interpreter().addType(&AxisOriginPy::Type,module,"AxisOrigin");
     }
 
     Base::PyGILStateLocker lock;
@@ -421,6 +432,7 @@ Application::Application(bool GUIenabled)
     OutputStdout                ::init_type();
     OutputStderr                ::init_type();
     PythonStdin                 ::init_type();
+    MDIViewPy                   ::init_type();
     View3DInventorPy            ::init_type();
     View3DInventorViewerPy      ::init_type();
     AbstractSplitViewPy         ::init_type();
@@ -503,11 +515,13 @@ void Application::open(const char* FileName, const char* Module)
     }
 
     if (Module != 0) {
-        // issue module loading
-        Command::doCommand(Command::App, "import %s", Module);
         try {
+            // issue module loading
+            Command::doCommand(Command::App, "import %s", Module);
+
             // load the file with the module
             Command::doCommand(Command::App, "%s.open(u\"%s\")", Module, unicodepath.c_str());
+
             // ViewFit
             if (!File.hasExtension("FCStd") && sendHasMsgToActiveView("ViewFit")) {
                 ParameterGrp::handle hGrp = App::GetApplication().GetParameterGroupByPath
@@ -515,6 +529,7 @@ void Application::open(const char* FileName, const char* Module)
                 if (hGrp->GetBool("AutoFitToView", true))
                     Command::doCommand(Command::Gui, "Gui.SendMsgToActiveView(\"ViewFit\")");
             }
+
             // the original file name is required
             QString filename = QString::fromUtf8(File.filePath().c_str());
             getMainWindow()->appendRecentFile(filename);
@@ -543,10 +558,10 @@ void Application::importFrom(const char* FileName, const char* DocName, const ch
     string unicodepath = Base::Tools::escapedUnicodeFromUtf8(File.filePath().c_str());
 
     if (Module != 0) {
-        // issue module loading
-        Command::doCommand(Command::App, "import %s", Module);
-
         try {
+            // issue module loading
+            Command::doCommand(Command::App, "import %s", Module);
+
             // load the file with the module
             if (File.hasExtension("FCStd")) {
                 Command::doCommand(Command::App, "%s.open(u\"%s\")"
@@ -662,9 +677,10 @@ void Application::createStandardOperations()
     Gui::CreateWindowStdCommands();
     Gui::CreateStructureCommands();
     Gui::CreateTestCommands();
+    Gui::CreateLinkCommands();
 }
 
-void Application::slotNewDocument(const App::Document& Doc)
+void Application::slotNewDocument(const App::Document& Doc, bool isMainDoc)
 {
 #ifdef FC_DEBUG
     std::map<const App::Document*, Gui::Document*>::const_iterator it = d->documents.find(&Doc);
@@ -681,13 +697,14 @@ void Application::slotNewDocument(const App::Document& Doc)
     pDoc->signalActivatedObject.connect(boost::bind(&Gui::Application::slotActivatedObject, this, _1));
     pDoc->signalInEdit.connect(boost::bind(&Gui::Application::slotInEdit, this, _1));
     pDoc->signalResetEdit.connect(boost::bind(&Gui::Application::slotResetEdit, this, _1));
- 
-    signalNewDocument(*pDoc);
-    pDoc->createView(View3DInventor::getClassTypeId());
+
+    signalNewDocument(*pDoc, isMainDoc);
+    if(isMainDoc)
+        pDoc->createView(View3DInventor::getClassTypeId());
     // FIXME: Do we really need this further? Calling processEvents() mixes up order of execution in an
     // unpredicatable way. At least it seems that with Qt5 we don't need this any more.
 #if QT_VERSION < 0x050000
-    qApp->processEvents(); // make sure to show the window stuff on the right place
+    // qApp->processEvents(); // make sure to show the window stuff on the right place
 #endif
 }
 
@@ -699,10 +716,14 @@ void Application::slotDeleteDocument(const App::Document& Doc)
         return;
     }
 
-    // We must clear the selection here to notify all observers
-    Gui::Selection().clearSelection(doc->second->getDocument()->getName());
+    // We must clear the selection here to notify all observers.
+    // And because of possible cross document link, better clear all selection
+    // to be safe
+    Gui::Selection().clearCompleteSelection();
     doc->second->signalDeleteDocument(*doc->second);
     signalDeleteDocument(*doc->second);
+
+    doc->second->beforeDelete();
 
     // If the active document gets destructed we must set it to 0. If there are further existing documents then the
     // view that becomes active sets the active document again. So, we needn't worry about this.
@@ -735,6 +756,16 @@ void Application::slotRenameDocument(const App::Document& Doc)
     signalRenameDocument(*doc->second);
 }
 
+void Application::slotShowHidden(const App::Document& Doc)
+{
+    std::map<const App::Document*, Gui::Document*>::iterator doc = d->documents.find(&Doc);
+#ifdef FC_DEBUG
+    assert(doc!=d->documents.end());
+#endif
+
+    signalShowHidden(*doc->second);
+}
+
 void Application::slotActiveDocument(const App::Document& Doc)
 {
     std::map<const App::Document*, Gui::Document*>::iterator doc = d->documents.find(&Doc);
@@ -748,6 +779,12 @@ void Application::slotActiveDocument(const App::Document& Doc)
                 Base::PyGILStateLocker lock;
                 Py::Object active(d->activeDocument->getPyObject(), true);
                 Py::Module("FreeCADGui").setAttr(std::string("ActiveDocument"),active);
+
+                auto view = getMainWindow()->activeWindow();
+                if(!view || view->getAppDocument()!=&Doc) {
+                    Gui::MDIView* view = d->activeDocument->getActiveView();
+                    getMainWindow()->setActiveWindow(view);
+                }
             }
             else {
                 Base::PyGILStateLocker lock;
@@ -755,6 +792,7 @@ void Application::slotActiveDocument(const App::Document& Doc)
             }
         }
         signalActiveDocument(*doc->second);
+        getMainWindow()->updateActions();
     }
 }
 
@@ -771,6 +809,7 @@ void Application::slotDeletedObject(const ViewProvider& vp)
 void Application::slotChangedObject(const ViewProvider& vp, const App::Property& prop)
 {
     this->signalChangedObject(vp,prop);
+    getMainWindow()->updateActions(true);
 }
 
 void Application::slotRelabelObject(const ViewProvider& vp)
@@ -781,6 +820,7 @@ void Application::slotRelabelObject(const ViewProvider& vp)
 void Application::slotActivatedObject(const ViewProvider& vp)
 {
     this->signalActivatedObject(vp);
+    getMainWindow()->updateActions();
 }
 
 void Application::slotInEdit(const Gui::ViewProviderDocumentObject& vp)
@@ -799,6 +839,19 @@ void Application::onLastWindowClosed(Gui::Document* pcDoc)
         try {
             // Call the closing mechanism from Python. This also checks whether pcDoc is the last open document.
             Command::doCommand(Command::Doc, "App.closeDocument(\"%s\")", pcDoc->getDocument()->getName());
+            if (!d->activeDocument && d->documents.size()) {
+                for(auto &v : d->documents) {
+                    Gui::MDIView* view = v.second->getActiveView();
+                    if(view) {
+                        setActiveDocument(v.second);
+                        getMainWindow()->setActiveWindow(view);
+                        return;
+                    }
+                }
+                auto gdoc = d->documents.begin()->second;
+                setActiveDocument(gdoc);
+                activateView(View3DInventor::getClassTypeId(),true);
+            }
         }
         catch (const Base::Exception& e) {
             e.ReportException();
@@ -821,6 +874,31 @@ bool Application::sendHasMsgToActiveView(const char* pMsg)
 {
     MDIView* pView = getMainWindow()->activeWindow();
     return pView ? pView->onHasMsg(pMsg) : false;
+}
+
+/// send Messages to the active view
+bool Application::sendMsgToFocusView(const char* pMsg, const char** ppReturn)
+{
+    MDIView* pView = getMainWindow()->activeWindow();
+    if(!pView)
+        return false;
+    for(auto focus=qApp->focusWidget();focus;focus=focus->parentWidget()) {
+        if(focus == pView)
+            return pView->onMsg(pMsg,ppReturn);
+    }
+    return false;
+}
+
+bool Application::sendHasMsgToFocusView(const char* pMsg)
+{
+    MDIView* pView = getMainWindow()->activeWindow();
+    if(!pView)
+        return false;
+    for(auto focus=qApp->focusWidget();focus;focus=focus->parentWidget()) {
+        if(focus == pView)
+            return pView->onHasMsg(pMsg);
+    }
+    return false;
 }
 
 Gui::MDIView* Application::activeView(void) const
@@ -860,10 +938,32 @@ Gui::Document* Application::activeDocument(void) const
     return d->activeDocument;
 }
 
+Gui::Document* Application::editDocument(void) const
+{
+    return d->editDocument;
+}
+
+Gui::MDIView* Application::editViewOfNode(SoNode *node) const
+{
+    return d->editDocument?d->editDocument->getViewOfNode(node):0;
+}
+
+void Application::setEditDocument(Gui::Document *doc) {
+    if(!doc) 
+        d->editDocument = 0;
+    for(auto &v : d->documents)
+        v.second->_resetEdit();
+    d->editDocument = doc;
+    getMainWindow()->updateActions();
+}
+
 void Application::setActiveDocument(Gui::Document* pcDocument)
 {
     if (d->activeDocument == pcDocument)
         return; // nothing needs to be done
+
+    getMainWindow()->updateActions();
+
     if (pcDocument) {
         // This happens if a document with more than one view is about being
         // closed and a second view is activated. The document is still not
@@ -1016,24 +1116,9 @@ void Application::updateActive(void)
 
 void Application::tryClose(QCloseEvent * e)
 {
-    if (d->documents.size() == 0) {
-        e->accept();
-    }
-    else {
-        // ask all documents if closable
-        std::map<const App::Document*, Gui::Document*>::iterator It;
-        for (It = d->documents.begin();It!=d->documents.end();++It) {
-            // a document may have several views attached, so ask it directly
-#if 0
-            MDIView* active = It->second->getActiveView();
-            e->setAccepted(active->canClose());
-#else
-            e->setAccepted(It->second->canClose());
-#endif
-            if (!e->isAccepted())
-                return;
-        }
-    }
+    e->setAccepted(getMainWindow()->closeAllDocuments(false));
+    if(!e->isAccepted())
+        return;
 
     // ask all passive views if closable
     for (std::list<Gui::BaseView*>::iterator It = d->passive.begin();It!=d->passive.end();++It) {
@@ -1055,14 +1140,7 @@ void Application::tryClose(QCloseEvent * e)
             itp = d->passive.begin();
         }
 
-        // remove all documents
-        size_t cnt = d->documents.size();
-        while (d->documents.size() > 0 && cnt > 0) {
-            // destroys also the Gui document
-            It = d->documents.begin();
-            App::GetApplication().closeDocument(It->second->getDocument()->getName());
-            --cnt; // avoid infinite loop
-        }
+        App::GetApplication().closeAllDocuments();
     }
 }
 
@@ -1177,7 +1255,7 @@ bool Application::activateWorkbench(const char* name)
     }
     catch (Py::Exception&) {
         Base::PyException e; // extract the Python error text
-        QString msg = QString::fromLatin1(e.what());
+        QString msg = QString::fromUtf8(e.what());
         QRegExp rx;
         // ignore '<type 'exceptions.ImportError'>' prefixes
         rx.setPattern(QLatin1String("^\\s*<type 'exceptions.ImportError'>:\\s*"));
@@ -1187,8 +1265,12 @@ bool Application::activateWorkbench(const char* name)
             pos = rx.indexIn(msg);
         }
 
-        Base::Console().Error("%s\n", (const char*)msg.toLatin1());
-        Base::Console().Error("%s\n", e.getStackTrace().c_str());
+        Base::Console().Error("%s\n", (const char*)msg.toUtf8());
+        if (!d->startingUp)
+            Base::Console().Error("%s\n", e.getStackTrace().c_str());
+        else
+            Base::Console().Log("%s\n", e.getStackTrace().c_str());
+
         if (!d->startingUp) {
             wc.restoreCursor();
             QMessageBox::critical(getMainWindow(), QObject::tr("Workbench failure"),
@@ -1575,6 +1657,7 @@ void Application::initTypes(void)
     Gui::View3DInventor                         ::init();
     Gui::AbstractSplitView                      ::init();
     Gui::SplitView3DInventor                    ::init();
+    Gui::TextDocumentEditorView                 ::init();
     // View Provider
     Gui::ViewProvider                           ::init();
     Gui::ViewProviderExtension                  ::init();
@@ -1601,6 +1684,7 @@ void Application::initTypes(void)
     Gui::ViewProviderPythonFeature              ::init();
     Gui::ViewProviderPythonGeometry             ::init();
     Gui::ViewProviderPlacement                  ::init();
+    Gui::ViewProviderPlacementPython            ::init();
     Gui::ViewProviderOriginFeature              ::init();
     Gui::ViewProviderPlane                      ::init();
     Gui::ViewProviderLine                       ::init();
@@ -1612,6 +1696,11 @@ void Application::initTypes(void)
     Gui::ViewProviderMaterialObject             ::init();
     Gui::ViewProviderMaterialObjectPython       ::init();
     Gui::ViewProviderTextDocument               ::init();
+    Gui::ViewProviderLinkObserver               ::init();
+    Gui::LinkView                               ::init();
+    Gui::ViewProviderLink                       ::init();
+    Gui::ViewProviderLinkPython                 ::init();
+    Gui::AxisOrigin                             ::init();
 
     // Workbench
     Gui::Workbench                              ::init();
@@ -1646,13 +1735,28 @@ void Application::runApplication(void)
     const std::map<std::string,std::string>& cfg = App::Application::Config();
     std::map<std::string,std::string>::const_iterator it;
 
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 9, 0))
+    QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+#endif
+
     // A new QApplication
     Base::Console().Log("Init: Creating Gui::Application and QApplication\n");
+
+#if defined(QTWEBENGINE) && defined(Q_OS_LINUX)
+    // Avoid warning of 'Qt WebEngine seems to be initialized from a plugin...'
+    // QTWEBENGINE is defined in src/Gui/CMakeLists.txt, currently only enabled
+    // when build with Conda.
+    QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+#endif
+
     // if application not yet created by the splasher
     int argc = App::Application::GetARGC();
     GUISingleApplication mainApp(argc, App::Application::GetARGV());
     // http://forum.freecadweb.org/viewtopic.php?f=3&t=15540
     mainApp.setAttribute(Qt::AA_DontShowIconsInMenus, false);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 0))
+    mainApp.setAttribute(Qt::AA_UseDesktopOpenGL);
+#endif
 
 #ifdef Q_OS_UNIX
     // Make sure that we use '.' as decimal point. See also
@@ -1690,7 +1794,7 @@ void Application::runApplication(void)
     }
 
 #if QT_VERSION >= 0x050600
-    //Enable automatic scaling based on pixel density fo display (added in Qt 5.6)
+    //Enable automatic scaling based on pixel density of display (added in Qt 5.6)
     mainApp.setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
 #if QT_VERSION >= 0x050100
@@ -1719,6 +1823,13 @@ void Application::runApplication(void)
              << QString::fromUtf8((App::Application::getResourceDir() + "Gui/Stylesheets/").c_str())
              << QLatin1String(":/stylesheets");
     QDir::setSearchPaths(QString::fromLatin1("qss"), qssPaths);
+
+    // set search paths for images
+    QStringList imagePaths;
+    imagePaths << QString::fromUtf8((App::Application::getUserAppDataDir() + "Gui/images").c_str())
+               << QString::fromUtf8((App::Application::getUserAppDataDir() + "pixmaps").c_str())
+               << QLatin1String(":/icons");
+    QDir::setSearchPaths(QString::fromLatin1("images"), imagePaths);
 
     // register action style event type
     ActionStyleEvent::EventType = QEvent::registerEventType(QEvent::User + 1);
@@ -1797,7 +1908,7 @@ void Application::runApplication(void)
         std::map<std::string, std::string>& config = App::Application::Config();
         QString major  = QString::fromLatin1(config["BuildVersionMajor"].c_str());
         QString minor  = QString::fromLatin1(config["BuildVersionMinor"].c_str());
-        QString title = QString::fromLatin1("%1 %2.%3").arg(mainApp.applicationName()).arg(major).arg(minor);
+        QString title = QString::fromLatin1("%1 %2.%3").arg(mainApp.applicationName(), major, minor);
         mw.setWindowTitle(title);
     } else {
         mw.setWindowTitle(mainApp.applicationName());
@@ -1942,8 +2053,11 @@ void Application::runApplication(void)
             qApp->sendEvent(&mw, &e);
         }
     }
-#if QT_VERSION == 0x050600 && defined(Q_OS_WIN32)
     else {
+        if (hGrp->GetBool("TiledBackground", false)) {
+            mdi->setBackground(QPixmap(QLatin1String("images:background.png")));
+        }
+#if QT_VERSION == 0x050600 && defined(Q_OS_WIN32)
         // Under Windows the tree indicator branch gets corrupted after a while.
         // For more details see also https://bugreports.qt.io/browse/QTBUG-52230
         // and https://codereview.qt-project.org/#/c/154357/2//ALL,unified
@@ -1957,8 +2071,8 @@ void Application::runApplication(void)
                "    image: url(:/icons/style/windows_branch_open.png);\n"
                "}\n");
         qApp->setStyleSheet(qss);
-    }
 #endif
+    }
 
     //initialize spaceball.
     mainApp.initSpaceball(&mw);
@@ -2098,4 +2212,62 @@ void Application::checkForPreviousCrashes()
         if (dlg.foundDocuments())
             dlg.exec();
     }
+}
+
+App::Document *Application::reopen(App::Document *doc) {
+    if(!doc) return 0;
+    std::string name = doc->FileName.getValue();
+    std::set<const Gui::Document*> untouchedDocs;
+    for(auto &v : d->documents) {
+        if(!v.second->isModified() && !v.second->getDocument()->isTouched())
+            untouchedDocs.insert(v.second);
+    }
+
+    WaitCursor wc;
+    wc.setIgnoreEvents(WaitCursor::NoEvents);
+
+    if(doc->testStatus(App::Document::PartialDoc) 
+            || doc->testStatus(App::Document::PartialRestore))
+    {
+        App::GetApplication().openDocument(name.c_str());
+    } else {
+        std::vector<std::string> docs;
+        for(auto d : doc->getDependentDocuments(true)) {
+            if(d->testStatus(App::Document::PartialDoc)
+                    || d->testStatus(App::Document::PartialRestore) )
+                docs.push_back(d->FileName.getValue());
+        }
+        for(auto &file : docs)
+            App::GetApplication().openDocument(file.c_str(),false);
+    }
+
+    doc = 0;
+    for(auto &v : d->documents) {
+        if(name == v.first->FileName.getValue())
+            doc = const_cast<App::Document*>(v.first);
+        if(untouchedDocs.count(v.second)) {
+            if(!v.second->isModified()) continue;
+            bool reset = true;
+            for(auto obj : v.second->getDocument()->getObjects()) {
+                if(!obj->isTouched())
+                    continue;
+                std::vector<App::Property*> props;
+                obj->getPropertyList(props);
+                for(auto prop : props){
+                    auto link = dynamic_cast<App::PropertyLinkBase*>(prop);
+                    if(link && link->checkRestore()) {
+                        reset = false;
+                        break;
+                    }
+                }
+                if(!reset)
+                    break;
+            }
+            if(reset) {
+                v.second->getDocument()->purgeTouched();
+                v.second->setModified(false);
+            }
+        }
+    }
+    return doc;
 }

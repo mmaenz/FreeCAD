@@ -75,6 +75,7 @@
 #include "ViewProviderCurvature.h"
 #include "MeshEditor.h"
 #include "Segmentation.h"
+#include "SegmentationBestFit.h"
 
 using namespace Mesh;
 
@@ -213,7 +214,7 @@ bool CmdMeshToolMesh::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshUnion);
+DEF_STD_CMD_A(CmdMeshUnion)
 
 CmdMeshUnion::CmdMeshUnion()
   :Command("Mesh_Union")
@@ -283,7 +284,7 @@ bool CmdMeshUnion::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshDifference);
+DEF_STD_CMD_A(CmdMeshDifference)
 
 CmdMeshDifference::CmdMeshDifference()
   :Command("Mesh_Difference")
@@ -353,7 +354,7 @@ bool CmdMeshDifference::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshIntersection);
+DEF_STD_CMD_A(CmdMeshIntersection)
 
 CmdMeshIntersection::CmdMeshIntersection()
   :Command("Mesh_Intersection")
@@ -423,7 +424,7 @@ bool CmdMeshIntersection::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshImport);
+DEF_STD_CMD_A(CmdMeshImport)
 
 CmdMeshImport::CmdMeshImport()
   :Command("Mesh_Import")
@@ -476,7 +477,7 @@ bool CmdMeshImport::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshExport);
+DEF_STD_CMD_A(CmdMeshExport)
 
 CmdMeshExport::CmdMeshExport()
   :Command("Mesh_Export")
@@ -547,7 +548,7 @@ bool CmdMeshExport::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshFromGeometry);
+DEF_STD_CMD_A(CmdMeshFromGeometry)
 
 CmdMeshFromGeometry::CmdMeshFromGeometry()
   :Command("Mesh_FromGeometry")
@@ -605,7 +606,7 @@ bool CmdMeshFromGeometry::isActive(void)
 //===========================================================================
 // Mesh_FromPart
 //===========================================================================
-DEF_STD_CMD_A(CmdMeshFromPartShape);
+DEF_STD_CMD_A(CmdMeshFromPartShape)
 
 CmdMeshFromPartShape::CmdMeshFromPartShape()
   : Command("Mesh_FromPartShape")
@@ -631,7 +632,7 @@ bool CmdMeshFromPartShape::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshVertexCurvature);
+DEF_STD_CMD_A(CmdMeshVertexCurvature)
 
 CmdMeshVertexCurvature::CmdMeshVertexCurvature()
   : Command("Mesh_VertexCurvature")
@@ -674,7 +675,7 @@ bool CmdMeshVertexCurvature::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshVertexCurvatureInfo);
+DEF_STD_CMD_A(CmdMeshVertexCurvatureInfo)
 
 CmdMeshVertexCurvatureInfo::CmdMeshVertexCurvatureInfo()
   :Command("Mesh_CurvatureInfo")
@@ -718,7 +719,7 @@ bool CmdMeshVertexCurvatureInfo::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshPolySegm);
+DEF_STD_CMD_A(CmdMeshPolySegm)
 
 CmdMeshPolySegm::CmdMeshPolySegm()
   :Command("Mesh_PolySegm")
@@ -774,7 +775,7 @@ bool CmdMeshPolySegm::isActive(void)
 
 //--------------------------------------------------------------------------------------
 #if 0
-DEF_STD_CMD_A(CmdMeshPolySelect);
+DEF_STD_CMD_A(CmdMeshPolySelect)
 
 CmdMeshPolySelect::CmdMeshPolySelect()
   : Command("Mesh_PolySelect")
@@ -827,7 +828,7 @@ bool CmdMeshPolySelect::isActive(void)
 #endif
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshAddFacet);
+DEF_STD_CMD_A(CmdMeshAddFacet)
 
 CmdMeshAddFacet::CmdMeshAddFacet()
   : Command("Mesh_AddFacet")
@@ -873,7 +874,7 @@ bool CmdMeshAddFacet::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshPolyCut);
+DEF_STD_CMD_A(CmdMeshPolyCut)
 
 CmdMeshPolyCut::CmdMeshPolyCut()
   : Command("Mesh_PolyCut")
@@ -934,7 +935,7 @@ bool CmdMeshPolyCut::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshPolyTrim);
+DEF_STD_CMD_A(CmdMeshPolyTrim)
 
 CmdMeshPolyTrim::CmdMeshPolyTrim()
   : Command("Mesh_PolyTrim")
@@ -994,7 +995,7 @@ bool CmdMeshPolyTrim::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshTrimByPlane);
+DEF_STD_CMD_A(CmdMeshTrimByPlane)
 
 CmdMeshTrimByPlane::CmdMeshTrimByPlane()
   : Command("Mesh_TrimByPlane")
@@ -1022,7 +1023,7 @@ bool CmdMeshTrimByPlane::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshSectionByPlane);
+DEF_STD_CMD_A(CmdMeshSectionByPlane)
 
 CmdMeshSectionByPlane::CmdMeshSectionByPlane()
   : Command("Mesh_SectionByPlane")
@@ -1050,7 +1051,32 @@ bool CmdMeshSectionByPlane::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshPolySplit);
+DEF_STD_CMD_A(CmdMeshCrossSections)
+
+CmdMeshCrossSections::CmdMeshCrossSections()
+  : Command("Mesh_CrossSections")
+{
+    sAppModule    = "Mesh";
+    sGroup        = QT_TR_NOOP("Mesh");
+    sMenuText     = QT_TR_NOOP("Cross-sections...");
+    sToolTipText  = QT_TR_NOOP("Cross-sections");
+    sStatusTip    = QT_TR_NOOP("Cross-sections");
+}
+
+void CmdMeshCrossSections::activated(int)
+{
+    doCommand(Doc,"import MeshPartGui, FreeCADGui\nFreeCADGui.runCommand('MeshPart_CrossSections')\n");
+}
+
+bool CmdMeshCrossSections::isActive(void)
+{
+    return (Gui::Selection().countObjectsOfType(Mesh::Feature::getClassTypeId()) > 0 &&
+            !Gui::Control().activeDialog());
+}
+
+//--------------------------------------------------------------------------------------
+
+DEF_STD_CMD_A(CmdMeshPolySplit)
 
 CmdMeshPolySplit::CmdMeshPolySplit()
   : Command("Mesh_PolySplit")
@@ -1104,7 +1130,7 @@ bool CmdMeshPolySplit::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshEvaluation);
+DEF_STD_CMD_A(CmdMeshEvaluation)
 
 CmdMeshEvaluation::CmdMeshEvaluation()
   :Command("Mesh_Evaluation")
@@ -1146,7 +1172,7 @@ bool CmdMeshEvaluation::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshEvaluateFacet);
+DEF_STD_CMD_A(CmdMeshEvaluateFacet)
 
 CmdMeshEvaluateFacet::CmdMeshEvaluateFacet()
   :Command("Mesh_EvaluateFacet")
@@ -1189,7 +1215,7 @@ bool CmdMeshEvaluateFacet::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshRemoveComponents);
+DEF_STD_CMD_A(CmdMeshRemoveComponents)
 
 CmdMeshRemoveComponents::CmdMeshRemoveComponents()
   : Command("Mesh_RemoveComponents")
@@ -1234,7 +1260,7 @@ bool CmdMeshRemoveComponents::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshRemoveCompByHand);
+DEF_STD_CMD_A(CmdMeshRemoveCompByHand)
 
 CmdMeshRemoveCompByHand::CmdMeshRemoveCompByHand()
   :Command("Mesh_RemoveCompByHand")
@@ -1276,7 +1302,7 @@ bool CmdMeshRemoveCompByHand::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshEvaluateSolid);
+DEF_STD_CMD_A(CmdMeshEvaluateSolid)
 
 CmdMeshEvaluateSolid::CmdMeshEvaluateSolid()
   :Command("Mesh_EvaluateSolid")
@@ -1313,7 +1339,7 @@ bool CmdMeshEvaluateSolid::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshSmoothing);
+DEF_STD_CMD_A(CmdMeshSmoothing)
 
 CmdMeshSmoothing::CmdMeshSmoothing()
   :Command("Mesh_Smoothing")
@@ -1375,7 +1401,7 @@ bool CmdMeshSmoothing::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshHarmonizeNormals);
+DEF_STD_CMD_A(CmdMeshHarmonizeNormals)
 
 CmdMeshHarmonizeNormals::CmdMeshHarmonizeNormals()
   :Command("Mesh_HarmonizeNormals")
@@ -1409,7 +1435,7 @@ bool CmdMeshHarmonizeNormals::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshFlipNormals);
+DEF_STD_CMD_A(CmdMeshFlipNormals)
 
 CmdMeshFlipNormals::CmdMeshFlipNormals()
   :Command("Mesh_FlipNormals")
@@ -1443,7 +1469,7 @@ bool CmdMeshFlipNormals::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshBoundingBox);
+DEF_STD_CMD_A(CmdMeshBoundingBox)
 
 CmdMeshBoundingBox::CmdMeshBoundingBox()
   :Command("Mesh_BoundingBox")
@@ -1484,7 +1510,7 @@ bool CmdMeshBoundingBox::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshBuildRegularSolid);
+DEF_STD_CMD_A(CmdMeshBuildRegularSolid)
 
 CmdMeshBuildRegularSolid::CmdMeshBuildRegularSolid()
   :Command("Mesh_BuildRegularSolid")
@@ -1511,7 +1537,7 @@ bool CmdMeshBuildRegularSolid::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshFillupHoles);
+DEF_STD_CMD_A(CmdMeshFillupHoles)
 
 CmdMeshFillupHoles::CmdMeshFillupHoles()
   :Command("Mesh_FillupHoles")
@@ -1548,7 +1574,7 @@ bool CmdMeshFillupHoles::isActive(void)
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshFillInteractiveHole);
+DEF_STD_CMD_A(CmdMeshFillInteractiveHole)
 
 CmdMeshFillInteractiveHole::CmdMeshFillInteractiveHole()
   :Command("Mesh_FillInteractiveHole")
@@ -1589,7 +1615,7 @@ bool CmdMeshFillInteractiveHole::isActive(void)
     return false;
 }
 
-DEF_STD_CMD_A(CmdMeshSegmentation);
+DEF_STD_CMD_A(CmdMeshSegmentation)
 
 CmdMeshSegmentation::CmdMeshSegmentation()
   : Command("Mesh_Segmentation")
@@ -1622,10 +1648,44 @@ bool CmdMeshSegmentation::isActive(void)
         (Mesh::Feature::getClassTypeId()) == 1;
 }
 
+//--------------------------------------------------------------------------------------
+
+DEF_STD_CMD_A(CmdMeshSegmentationBestFit)
+
+CmdMeshSegmentationBestFit::CmdMeshSegmentationBestFit()
+  : Command("Mesh_SegmentationBestFit")
+{
+    sAppModule    = "Mesh";
+    sGroup        = QT_TR_NOOP("Mesh");
+    sMenuText     = QT_TR_NOOP("Create mesh segments from best-fit surfaces...");
+    sToolTipText  = QT_TR_NOOP("Create mesh segments from best-fit surfaces");
+    sWhatsThis    = "Mesh_SegmentationBestFit";
+    sStatusTip    = QT_TR_NOOP("Create mesh segments from best-fit surfaces");
+}
+
+void CmdMeshSegmentationBestFit::activated(int)
+{
+    std::vector<App::DocumentObject*> objs = Gui::Selection().getObjectsOfType
+        (Mesh::Feature::getClassTypeId());
+    Mesh::Feature* mesh = static_cast<Mesh::Feature*>(objs.front());
+    Gui::TaskView::TaskDialog* dlg = Gui::Control().activeDialog();
+    if (!dlg) {
+        dlg = new MeshGui::TaskSegmentationBestFit(mesh);
+    }
+    Gui::Control().showDialog(dlg);
+}
+
+bool CmdMeshSegmentationBestFit::isActive(void)
+{
+    if (Gui::Control().activeDialog())
+        return false;
+    return Gui::Selection().countObjectsOfType
+        (Mesh::Feature::getClassTypeId()) == 1;
+}
 
 //--------------------------------------------------------------------------------------
 
-DEF_STD_CMD_A(CmdMeshMerge);
+DEF_STD_CMD_A(CmdMeshMerge)
 
 CmdMeshMerge::CmdMeshMerge()
   :Command("Mesh_Merge")
@@ -1734,6 +1794,7 @@ void CreateMeshCommands(void)
     rcCmdMgr.addCommand(new CmdMeshPolyTrim());
     rcCmdMgr.addCommand(new CmdMeshTrimByPlane());
     rcCmdMgr.addCommand(new CmdMeshSectionByPlane());
+    rcCmdMgr.addCommand(new CmdMeshCrossSections());
     rcCmdMgr.addCommand(new CmdMeshEvaluation());
     rcCmdMgr.addCommand(new CmdMeshEvaluateFacet());
     rcCmdMgr.addCommand(new CmdMeshEvaluateSolid());
@@ -1749,6 +1810,7 @@ void CreateMeshCommands(void)
     rcCmdMgr.addCommand(new CmdMeshFromGeometry());
     rcCmdMgr.addCommand(new CmdMeshFromPartShape());
     rcCmdMgr.addCommand(new CmdMeshSegmentation());
+    rcCmdMgr.addCommand(new CmdMeshSegmentationBestFit);
     rcCmdMgr.addCommand(new CmdMeshMerge());
     rcCmdMgr.addCommand(new CmdMeshScale());
 }

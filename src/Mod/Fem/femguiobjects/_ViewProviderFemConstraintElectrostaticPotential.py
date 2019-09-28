@@ -1,6 +1,6 @@
 # ***************************************************************************
 # *                                                                         *
-# *   Copyright (c) 2017 - Markus Hovorka <m.hovorka@live.de>               *
+# *   Copyright (c) 2017 Markus Hovorka <m.hovorka@live.de>                 *
 # *                                                                         *
 # *   This program is free software; you can redistribute it and/or modify  *
 # *   it under the terms of the GNU Lesser General Public License (LGPL)    *
@@ -20,18 +20,20 @@
 # *                                                                         *
 # ***************************************************************************
 
-
-__title__ = "view provider for constraint electrostatic potential object"
+__title__ = "FreeCAD FEM constraint electrostatic potential ViewProvider for the document object"
 __author__ = "Markus Hovorka, Bernd Hahnebach"
 __url__ = "http://www.freecadweb.org"
 
+## @package ViewProviderFemConstraintElctrostaticPotential
+#  \ingroup FEM
+#  \brief FreeCAD FEM view provider for constraint electrostatic potential object
 
 import FreeCAD
 import FreeCADGui
 from . import ViewProviderFemConstraint
 
 # for the panel
-import femtools.femutils as FemUtils
+import femtools.femutils as femutils
 from FreeCAD import Units
 from . import FemSelectionWidgets
 
@@ -66,9 +68,11 @@ class _TaskPanel(object):
             FreeCAD.getHomePath() + "Mod/Fem/Resources/ui/ElectrostaticPotential.ui")
         self._initParamWidget()
         self.form = [self._refWidget, self._paramWidget]
-        analysis = FemUtils.findAnalysisOfMember(obj)
-        self._mesh = FemUtils.getSingleMember(analysis, "Fem::FemMeshObject")
-        self._part = self._mesh.Part if self._mesh is not None else None
+        analysis = femutils.findAnalysisOfMember(obj)
+        self._mesh = femutils.get_single_member(analysis, "Fem::FemMeshObject")
+        self._part = None
+        if self._mesh is not None:
+            self._part = femutils.get_part_to_mesh(self._mesh)
         self._partVisible = None
         self._meshVisible = None
 
@@ -120,6 +124,18 @@ class _TaskPanel(object):
         self._obj.PotentialEnabled = \
             not self._paramWidget.potentialBox.isChecked()
         if self._obj.PotentialEnabled:
-            quantity = Units.Quantity(self._paramWidget.potentialTxt.text())
-            self._obj.Potential = float(quantity.getValueAs(unit))
+            # if the input widget shows not a green hook, but the user presses ok
+            # we could run into a syntax error on getting the quantity, try mV
+            quantity = None
+            try:
+                quantity = Units.Quantity(self._paramWidget.potentialTxt.text())
+            except ValueError:
+                FreeCAD.Console.PrintMessage(
+                    "Wrong input. OK has been triggered without a green hook "
+                    "in the input field. Not recognised input: '{}' "
+                    "Potential has not been set.\n"
+                    .format(self._paramWidget.potentialTxt.text())
+                )
+            if quantity is not None:
+                self._obj.Potential = float(quantity.getValueAs(unit))
         self._obj.PotentialConstant = self._paramWidget.potentialConstantBox.isChecked()

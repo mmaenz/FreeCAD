@@ -25,7 +25,11 @@ __author__ = "Yorik van Havre"
 __url__ = "http://www.freecadweb.org"
 
 
-import FreeCAD,os,zipfile,re,sys
+import FreeCAD
+import os
+import zipfile
+import re
+import sys
 if FreeCAD.GuiUp:
     import FreeCADGui
     from PySide import QtCore, QtGui
@@ -91,12 +95,23 @@ class ArchReference:
             obj.addProperty("App::PropertyFile","File","Reference",QT_TRANSLATE_NOOP("App::Property","The base file this component is built upon"))
         if not "Part" in pl:
             obj.addProperty("App::PropertyString","Part","Reference",QT_TRANSLATE_NOOP("App::Property","The part to use from the base file"))
+        if not "ReferenceMode" in pl:
+            obj.addProperty("App::PropertyEnumeration","ReferenceMode","Reference",QT_TRANSLATE_NOOP("App::Property","The way the referenced objects are included in the current document. 'Normal' includes the shape, 'Transient' discards the shape when the object is switched off (smaller filesize), 'Lightweight' does not import the shape but only the OpenInventor representation"))
+            obj.ReferenceMode = ["Normal","Transient","Lightweight"]
+            if "TransientReference" in pl:
+                if obj.TransientReference:
+                    obj.ReferenceMode = "Transient"
+                obj.removeProperty("TransientReference")
+                FreeCAD.Console.PrintMessage("Upgrading "+obj.Label+" TransientReference property to ReferenceMode\n")
         self.Type = "Reference"
 
     def onDocumentRestored(self,obj):
 
         ArchReference.setProperties(self,obj)
         self.reload = False
+        if obj.ReferenceMode == "Lightweight":
+            if obj.ViewObject and obj.ViewObject.Proxy:
+                obj.ViewObject.Proxy.loadInventor(obj)
 
     def __getstate__(self):
 
@@ -110,13 +125,34 @@ class ArchReference:
 
         if prop in ["File","Part"]:
             self.reload = True
+        elif prop == "ReferenceMode":
+            if obj.ReferenceMode == "Normal":
+                if obj.ViewObject and obj.ViewObject.Proxy:
+                    obj.ViewObject.Proxy.unloadInventor(obj)
+                if (not obj.Shape) or obj.Shape.isNull():
+                    self.reload = True
+                    obj.touch()
+            elif obj.ReferenceMode == "Transient":
+                if obj.ViewObject and obj.ViewObject.Proxy:
+                    obj.ViewObject.Proxy.unloadInventor(obj)
+                self.reload = False
+            elif obj.ReferenceMode == "Lightweight":
+                self.reload = False
+                import Part
+                pl = obj.Placement
+                obj.Shape = Part.Shape()
+                obj.Placement = pl
+                if obj.ViewObject and obj.ViewObject.Proxy:
+                    obj.ViewObject.Proxy.loadInventor(obj)
 
     def execute(self,obj):
 
-        if obj.File and obj.Part and self.reload:
+        pl = obj.Placement
+        filename = self.getFile(obj)
+        if filename and obj.Part and self.reload and obj.ReferenceMode in ["Normal","Transient"]:
             self.parts = self.getPartsList(obj)
             if self.parts:
-                zdoc = zipfile.ZipFile(obj.File)
+                zdoc = zipfile.ZipFile(filename)
                 if zdoc:
                     if obj.Part in self.parts:
                         if self.parts[obj.Part][1] in zdoc.namelist():
@@ -129,20 +165,50 @@ class ArchReference:
                                 shapedata = shapedata.decode("utf8")
                             shape.importBrepFromString(shapedata)
                             obj.Shape = shape
+                            if not pl.isIdentity():
+                                obj.Placement = pl
                         else:
                             print("Part not found in file")
             self.reload = False
 
-    def getPartsList(self,obj,filename=None):
+    def getFile(self,obj,filename=None):
+        
+        "gets a valid file, if possible"
 
-        parts = {}
         if not filename:
             filename = obj.File
         if not filename:
-            return parts
+            return None
         if not filename.lower().endswith(".fcstd"):
-            return parts
+            return None
         if not os.path.exists(filename):
+            # search for the file in the current directory if not found
+            basename = os.path.basename(filename)
+            currentdir = os.path.dirname(obj.Document.FileName)
+            altfile = os.path.join(currentdir,basename)
+            if altfile == obj.Document.FileName:
+                return None
+            elif os.path.exists(altfile):
+                return altfile
+            else:
+                # search for subpaths in current folder
+                altfile = None
+                subdirs = self.splitall(os.path.dirname(filename))
+                for i in range(len(subdirs)):
+                    subpath = [currentdir]+subdirs[-i:]+[basename]
+                    altfile = os.path.join(*subpath)
+                    if os.path.exists(altfile):
+                        return altfile
+                return None
+        return filename
+
+    def getPartsList(self,obj,filename=None):
+        
+        "returns a list of Part-based objects in a FCStd file"
+
+        parts = {}
+        filename = self.getFile(obj,filename)
+        if not filename:
             return parts
         zdoc = zipfile.ZipFile(filename)
         with zdoc.open("Document.xml") as docf:
@@ -180,12 +246,10 @@ class ArchReference:
 
     def getColors(self,obj):
 
-        filename = obj.File
+        "returns the DiffuseColor of the referenced object"
+
+        filename = self.getFile(obj)
         if not filename:
-            return None
-        if not filename.lower().endswith(".fcstd"):
-            return None
-        if not os.path.exists(filename):
             return None
         part = obj.Part
         if not obj.Part:
@@ -226,6 +290,24 @@ class ArchReference:
         if colors:
             return colors
         return None
+
+    def splitall(self,path):
+    
+        "splits a path between its components"
+    
+        allparts = []
+        while 1:
+            parts = os.path.split(path)
+            if parts[0] == path:  # sentinel for absolute paths
+                allparts.insert(0, parts[0])
+                break
+            elif parts[1] == path: # sentinel for relative paths
+                allparts.insert(0, parts[1])
+                break
+            else:
+                path = parts[0]
+                allparts.insert(0, parts[1])
+        return allparts
 
 
 class ViewProviderArchReference:
@@ -290,9 +372,12 @@ class ViewProviderArchReference:
     def updateData(self,obj,prop):
         
         if (prop == "Shape") and hasattr(obj.ViewObject,"UpdateColors") and obj.ViewObject.UpdateColors:
-            colors = obj.Proxy.getColors(obj)
-            if colors:
-                obj.ViewObject.DiffuseColor = colors
+            if obj.Shape and not obj.Shape.isNull():
+                colors = obj.Proxy.getColors(obj)
+                if colors:
+                    obj.ViewObject.DiffuseColor = colors
+                from DraftGui import todo
+                todo.delay(self.recolorize,obj.ViewObject)
 
     def recolorize(self,vobj):
         
@@ -312,13 +397,15 @@ class ViewProviderArchReference:
                     self.timer.stop()
                     del self.timer
             if f:
-                st_mtime = os.stat(self.Object.File).st_mtime
-                if hasattr(self.Object.ViewObject,"TimeStamp"):
-                    if self.Object.ViewObject.TimeStamp:
-                        if self.Object.ViewObject.TimeStamp != st_mtime:
-                            self.Object.Proxy.reload = True
-                            self.Object.touch()
-                    self.Object.ViewObject.TimeStamp = st_mtime
+                filename = self.Object.Proxy.getFile(self.Object)
+                if filename:
+                    st_mtime = os.stat(filename).st_mtime
+                    if hasattr(self.Object.ViewObject,"TimeStamp"):
+                        if self.Object.ViewObject.TimeStamp:
+                            if self.Object.ViewObject.TimeStamp != st_mtime:
+                                self.Object.Proxy.reload = True
+                                self.Object.touch()
+                        self.Object.ViewObject.TimeStamp = st_mtime
 
     def onChanged(self,vobj,prop):
 
@@ -327,12 +414,25 @@ class ViewProviderArchReference:
             if hasattr(vobj,"DiffuseColor") and hasattr(vobj,"UpdateColors"):
                 if vobj.DiffuseColor and vobj.UpdateColors:
                     vobj.DiffuseColor = vobj.DiffuseColor
+        elif prop == "Visibility":
+            if vobj.Visibility == True:
+                if (not vobj.Object.Shape) or vobj.Object.Shape.isNull():
+                    vobj.Object.Proxy.reload = True
+                    vobj.Object.Proxy.execute(vobj.Object)
+            else:
+                if hasattr(vobj.Object,"ReferenceMode") and vobj.Object.ReferenceMode == "Transient":
+                    vobj.Object.Proxy.reload = False
+                    import Part
+                    pl = vobj.Object.Placement
+                    vobj.Object.Shape = Part.Shape()
+                    vobj.Object.Placement = pl
 
     def onDelete(self,obj,doc):
 
         if hasattr(self,"timer"):
             self.timer.stop()
             del self.timer
+            return True
 
     def setupContextMenu(self,vobj,menu):
 
@@ -360,11 +460,127 @@ class ViewProviderArchReference:
             if self.Object.File:
                 FreeCAD.openDocument(self.Object.File)
 
+    def loadInventor(self,obj):
+        
+        "loads an openinventor file and replace the root node of this object"
+
+        # check inventor contents
+        ivstring = self.getInventorString(obj)
+        if not ivstring:
+            FreeCAD.Console.PrintWarning("Unable to get lightWeight node for object referenced in "+obj.Label+"\n")
+            return
+        from pivy import coin
+        inputnode = coin.SoInput()
+        inputnode.setBuffer(ivstring)
+        lwnode = coin.SoDB.readAll(inputnode)
+        if not isinstance(lwnode,coin.SoSeparator):
+            FreeCAD.Console.PrintError("Invalid lightWeight node for object referenced in "+obj.Label+"\n")
+            return
+        if lwnode.getNumChildren() < 2:
+            FreeCAD.Console.PrintError("Invalid lightWeight node for object referenced in "+obj.Label+"\n")
+            return
+        flatlines = lwnode
+        shaded = lwnode.getChild(0)
+        wireframe = lwnode.getChild(1)
+        
+        # check node contents
+        rootnode = obj.ViewObject.RootNode
+        if rootnode.getNumChildren() < 3:
+            FreeCAD.Console.PrintError("Invalid root node in "+obj.Label+"\n")
+            return
+        switch = rootnode.getChild(2)
+        if switch.getNumChildren() != 4:
+            FreeCAD.Console.PrintError("Invalid root node in "+obj.Label+"\n")
+            return
+
+        # keep a copy of the original nodes
+        self.orig_flatlines = switch.getChild(0).copy()
+        self.orig_shaded = switch.getChild(1).copy()
+        self.orig_wireframe = switch.getChild(2).copy()
+
+        # replace root node of object
+        switch.replaceChild(0,flatlines)
+        switch.replaceChild(1,shaded)
+        switch.replaceChild(2,wireframe)
+
+    def unloadInventor(self,obj):
+        
+        "restore original nodes"
+
+        if (not hasattr(self,"orig_flatlines")) or (not self.orig_flatlines):
+            return
+        if (not hasattr(self,"orig_shaded")) or (not self.orig_shaded):
+            return
+        if (not hasattr(self,"orig_wireframe")) or (not self.orig_wireframe):
+            return
+
+        # check node contents
+        rootnode = obj.ViewObject.RootNode
+        if rootnode.getNumChildren() < 3:
+            FreeCAD.Console.PrintError("Invalid root node in "+obj.Label+"\n")
+            return
+        switch = rootnode.getChild(2)
+        if switch.getNumChildren() != 4:
+            FreeCAD.Console.PrintError("Invalid root node in "+obj.Label+"\n")
+            return
+
+        # replace root node of object        
+        switch.replaceChild(0,self.orig_flatlines)
+        switch.replaceChild(1,self.orig_shaded)
+        switch.replaceChild(2,self.orig_wireframe)
+        
+        # discard old content
+        self.orig_flatlines = None
+        self.orig_shaded = None
+        self.orig_wireframe = None
+
+    def getInventorString(self,obj):
+        
+        "locates and loads an iv file saved together with an object, if existing"
+
+        filename = obj.Proxy.getFile(obj)
+        if not filename:
+            return None
+        part = obj.Part
+        if not obj.Part:
+            return None
+        zdoc = zipfile.ZipFile(filename)
+        if not "Document.xml" in zdoc.namelist():
+            return None
+        ivfile = None
+        with zdoc.open("Document.xml") as docf:
+            writemode1 = False
+            writemode2 = False
+            for line in docf:
+                if sys.version_info.major >= 3:
+                    line = line.decode("utf8")
+                if ("<Object name=" in line) and (part in line):
+                    writemode1 = True
+                elif writemode1 and ("<Property name=\"SavedInventor\"" in line):
+                    writemode1 = False
+                    writemode2 = True
+                elif writemode2 and ("<FileIncluded file=" in line):
+                    n = re.findall('file=\"(.*?)\"',line)
+                    if n:
+                        ivfile = n[0]
+                        break
+        if not ivfile:
+            return None
+        if not ivfile in zdoc.namelist():
+            return None
+        f = zdoc.open(ivfile)
+        buf = f.read()
+        if sys.version_info.major >= 3:
+            buf = buf.decode("utf8")
+        f.close()
+        buf = buf.replace("lineWidth 2","lineWidth "+str(int(obj.ViewObject.LineWidth)))
+        return buf
+
 
 class ArchReferenceTaskPanel:
 
 
-    '''The editmode TaskPanel for Axis objects'''
+    '''The editmode TaskPanel for Reference objects'''
 
     def __init__(self,obj):
 
@@ -404,6 +620,28 @@ class ArchReferenceTaskPanel:
         QtCore.QObject.connect(self.fileButton, QtCore.SIGNAL("clicked()"), self.chooseFile)
         QtCore.QObject.connect(self.openButton, QtCore.SIGNAL("clicked()"), self.openFile)
 
+    def accept(self):
+
+        if self.filename:
+            if self.filename != self.obj.File:
+                self.obj.File = self.filename
+                FreeCAD.ActiveDocument.recompute()
+        if self.partCombo.currentText():
+            i = self.partCombo.currentIndex()
+            if self.partCombo.itemData(i) != self.obj.Part:
+                self.obj.Part = self.partCombo.itemData(i)
+                if self.obj.Label == "External Reference":
+                    self.obj.Label = self.partCombo.itemText(i)
+                FreeCAD.ActiveDocument.recompute()
+        FreeCADGui.ActiveDocument.resetEdit()
+        return True
+
+    def reject(self):
+
+        FreeCAD.ActiveDocument.recompute()
+        FreeCADGui.ActiveDocument.resetEdit()
+        return True
+
     def chooseFile(self):
 
         loc = QtCore.QDir.homePath()
@@ -423,25 +661,11 @@ class ArchReferenceTaskPanel:
                         self.partCombo.setCurrentIndex(sorted(parts.keys()).index(self.obj.Part))
 
     def openFile(self):
+
         if self.obj.File:
             FreeCAD.openDocument(self.obj.File)
             FreeCADGui.Control.closeDialog()
             FreeCADGui.ActiveDocument.resetEdit()
-
-    def accept(self):
-
-        if self.filename:
-            if self.filename != self.obj.File:
-                self.obj.File = self.filename
-                FreeCAD.ActiveDocument.recompute()
-        if self.partCombo.currentText():
-            i = self.partCombo.currentIndex()
-            if self.partCombo.itemData(i) != self.obj.Part:
-                self.obj.Part = self.partCombo.itemData(i)
-                FreeCAD.ActiveDocument.recompute()
-        FreeCADGui.ActiveDocument.resetEdit()
-        return True
-
 
 
 class ArchReferenceCommand:
@@ -470,6 +694,8 @@ class ArchReferenceCommand:
         FreeCADGui.doCommand("Draft.autogroup(obj)")
         FreeCAD.ActiveDocument.commitTransaction()
         FreeCADGui.doCommand("obj.ViewObject.Document.setEdit(obj.ViewObject, 0)")
+
+
 
 if FreeCAD.GuiUp:
     FreeCADGui.addCommand('Arch_Reference', ArchReferenceCommand())

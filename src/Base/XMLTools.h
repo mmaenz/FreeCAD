@@ -154,9 +154,13 @@ inline StrXUTF8::StrXUTF8(const XMLCh* const toTranscode)
     while (inputLength)
     {
         outputLength = transcoder->transcodeTo(toTranscode + offset, inputLength, outBuff, 128, eaten, XMLTranscoder::UnRep_RepChar);
-        str.append((const char*)outBuff, outputLength);
+        str.append(reinterpret_cast<const char*>(outBuff), outputLength);
         offset += eaten;
         inputLength -= eaten;
+
+        //  Bail out if nothing more was produced
+        if (outputLength == 0)
+            break;
     }
 }
 
@@ -254,7 +258,7 @@ inline XUTF8Str::XUTF8Str(const char* const fromTranscode)
     }
 
     static XMLCh outBuff[128];
-    XMLByte* xmlBytes = (XMLByte*)fromTranscode;
+    const XMLByte* xmlBytes = reinterpret_cast<const XMLByte*>(fromTranscode);
 #if (XERCES_VERSION_MAJOR == 2)
     unsigned int outputLength;
     unsigned int eaten = 0;
@@ -274,6 +278,10 @@ inline XUTF8Str::XUTF8Str(const char* const fromTranscode)
         str.append(outBuff, outputLength);
         offset += eaten;
         inputLength -= eaten;
+
+        //  Bail out if nothing more was produced
+        if (outputLength == 0)
+            break;
     }
 
     delete[] charSizes;

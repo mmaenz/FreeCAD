@@ -66,6 +66,7 @@ DrawViewSymbol::~DrawViewSymbol()
 
 void DrawViewSymbol::onChanged(const App::Property* prop)
 {
+//    Base::Console().Message("DVS::onChanged(%s) \n",prop->getName());
     if (prop == &Symbol) {
         if (!isRestoring()) {
             //this pulls the initial values from svg into editabletexts
@@ -83,7 +84,7 @@ void DrawViewSymbol::onChanged(const App::Property* prop)
                     tbegin = twhat[0].second;
                 }
                 EditableTexts.setValues(eds);
-                requestPaint();
+//                requestPaint();
             }
         }
     }
@@ -92,9 +93,11 @@ void DrawViewSymbol::onChanged(const App::Property* prop)
 
 App::DocumentObjectExecReturn *DrawViewSymbol::execute(void)
 {
-    if (!keepUpdated()) {
-        return App::DocumentObject::StdReturn;
-    }
+//    Base::Console().Message("DVS::execute() \n");
+//    //dvs::execute is pretty fast. doesn't need to be blocked?
+//    if (!keepUpdated()) {
+//        return App::DocumentObject::StdReturn;
+//    }
 
     std::string svg = Symbol.getValue();
     const std::vector<std::string>& editText = EditableTexts.getValues();
@@ -120,7 +123,7 @@ App::DocumentObjectExecReturn *DrawViewSymbol::execute(void)
 
     }
     Symbol.setValue(newsvg);
-    requestPaint();
+//    requestPaint();
     return DrawView::execute();
 }
 

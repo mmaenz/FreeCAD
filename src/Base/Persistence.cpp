@@ -34,7 +34,7 @@
 
 using namespace Base;
 
-TYPESYSTEM_SOURCE_ABSTRACT(Base::Persistence,Base::BaseClass);
+TYPESYSTEM_SOURCE_ABSTRACT(Base::Persistence,Base::BaseClass)
 
 
 //**************************************************************************
@@ -129,4 +129,5 @@ void Persistence::restoreFromStream(std::istream& stream)
     reader.readElement("Content");
     Restore(reader);
     reader.readFiles(zipstream);
+    restoreFinished();
 }

@@ -136,6 +136,8 @@ public:
     bool exportToVrml(const char* filename, const MeshCore::Material&, bool binary=false) const;
     void exportMesh(const char* filename, const char* fmt=0) const;
     void setupContextMenu(QMenu*, QObject*, const char*);
+    /// Get the python wrapper for that ViewProvider
+    PyObject* getPyObject();
 
     /** @name Editing */
     //@{
@@ -185,9 +187,12 @@ protected:
     virtual void unhighlightSelection();
     void highlightComponents();
     void setHighlightedComponents(bool);
+    void highlightSegments();
+    void setHighlightedSegments(bool);
     App::PropertyColorList* getColorProperty() const;
-    void tryColorPerVertex(bool);
+    void tryColorPerVertexOrFace(bool);
     void setColorPerVertex(const App::PropertyColorList*);
+    void setColorPerFace(const App::PropertyColorList*);
 
     virtual SoShape* getShapeNode() const;
     virtual SoNode* getCoordNode() const;
@@ -211,6 +216,7 @@ private:
     static void panCamera(SoCamera*, float, const SbPlane&, const SbVec2f&, const SbVec2f&);
 
 protected:
+    std::string highlightMode;
     Gui::SoFCSelection  * pcHighlight;
     SoGroup             * pcShapeGroup;
     SoDrawStyle         * pcLineStyle;

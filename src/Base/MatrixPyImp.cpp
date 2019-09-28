@@ -238,6 +238,14 @@ PyObject* MatrixPy::scale(PyObject * args)
     Py_Return;
 }
 
+PyObject* MatrixPy::hasScale(PyObject * args)
+{
+    double tol=0;
+    if(!PyArg_ParseTuple(args, "|d", &tol))
+        return 0;
+    return Py::new_reference_to(Py::Int(getMatrixPtr()->hasScale(tol)));
+}
+
 PyObject* MatrixPy::unity(PyObject * args)
 {
     if (!PyArg_ParseTuple(args, ""))     // convert args: Python->C
@@ -385,6 +393,16 @@ PyObject* MatrixPy::multiply(PyObject * args)
 
     PyErr_SetString(Base::BaseExceptionFreeCADError, "either vector or matrix expected");
     return 0;
+}
+
+PyObject* MatrixPy::multVec(PyObject * args)
+{
+    PyObject *obj;
+    if (!PyArg_ParseTuple(args, "O!", &(VectorPy::Type), &obj))
+        return NULL;
+    Base::Vector3d vec(static_cast<VectorPy*>(obj)->value());
+    getMatrixPtr()->multVec(vec, vec);
+    return new VectorPy(new Vector3d(vec));
 }
 
 PyObject* MatrixPy::invert(PyObject * args)
@@ -726,7 +744,7 @@ Py::Sequence MatrixPy::getA(void) const
     for (int i=0; i<16; i++) {
         tuple[i] = Py::Float(mat[i]);
     }
-    return tuple;
+    return std::move(tuple);
 }
 
 void MatrixPy::setA(Py::Sequence arg)

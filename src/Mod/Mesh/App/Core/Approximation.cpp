@@ -25,9 +25,12 @@
 
 #ifndef _PreComp_
 # include <algorithm>
+# include <cstdlib>
+# include <iterator> 
 #endif
 
 #include "Approximation.h"
+#include "Utilities.h"
 
 #include <Base/BoundBox.h>
 #include <boost/math/special_functions/fpclassify.hpp>
@@ -55,22 +58,12 @@ Approximation::~Approximation()
     Clear();
 }
 
-void Approximation::Convert( const Wm4::Vector3<double>& Wm4, Base::Vector3f& pt)
-{
-    pt.Set( (float)Wm4.X(), (float)Wm4.Y(), (float)Wm4.Z() );
-}
-
-void Approximation::Convert( const Base::Vector3f& pt, Wm4::Vector3<double>& Wm4)
-{
-    Wm4.X() = pt.x; Wm4.Y() = pt.y; Wm4.Z() = pt.z;
-}
-
 void Approximation::GetMgcVectorArray(std::vector< Wm4::Vector3<double> >& rcPts) const
 {
     std::list< Base::Vector3f >::const_iterator It;
+    rcPts.reserve(_vPoints.size());
     for (It = _vPoints.begin(); It != _vPoints.end(); ++It) {
-        Wm4::Vector3<double> pt( (*It).x, (*It).y, (*It).z );
-        rcPts.push_back( pt );
+        rcPts.push_back(Base::convertTo<Wm4::Vector3d>(*It));
     }
 }
 
@@ -80,27 +73,21 @@ void Approximation::AddPoint(const Base::Vector3f &rcVector)
     _bIsFitted = false;
 }
 
-void Approximation::AddPoints(const std::vector<Base::Vector3f> &rvPointVect)
+void Approximation::AddPoints(const std::vector<Base::Vector3f> &points)
 {
-    std::vector<Base::Vector3f>::const_iterator cIt;
-    for (cIt = rvPointVect.begin(); cIt != rvPointVect.end(); ++cIt)
-        _vPoints.push_back(*cIt);
+    std::copy(points.begin(), points.end(), std::back_inserter(_vPoints));
     _bIsFitted = false;
 }
 
-void Approximation::AddPoints(const std::set<Base::Vector3f> &rsPointSet)
+void Approximation::AddPoints(const std::set<Base::Vector3f> &points)
 {
-    std::set<Base::Vector3f>::const_iterator cIt;
-    for (cIt = rsPointSet.begin(); cIt != rsPointSet.end(); ++cIt)
-        _vPoints.push_back(*cIt);
+    std::copy(points.begin(), points.end(), std::back_inserter(_vPoints));
     _bIsFitted = false;
 }
 
-void Approximation::AddPoints(const std::list<Base::Vector3f> &rsPointList)
+void Approximation::AddPoints(const std::list<Base::Vector3f> &points)
 {
-    std::list<Base::Vector3f>::const_iterator cIt;
-    for (cIt = rsPointList.begin(); cIt != rsPointList.end(); ++cIt)
-        _vPoints.push_back(*cIt);
+    std::copy(points.begin(), points.end(), std::back_inserter(_vPoints));
     _bIsFitted = false;
 }
 
@@ -157,22 +144,22 @@ float PlaneFit::Fit()
         return FLOAT_MAX;
 
     double sxx,sxy,sxz,syy,syz,szz,mx,my,mz;
-    sxx=sxy=sxz=syy=syz=szz=mx=my=mz=0.0f;
+    sxx=sxy=sxz=syy=syz=szz=mx=my=mz=0.0;
 
     for (std::list<Base::Vector3f>::iterator it = _vPoints.begin(); it!=_vPoints.end(); ++it) {
-        sxx += it->x * it->x; sxy += it->x * it->y;
-        sxz += it->x * it->z; syy += it->y * it->y;
-        syz += it->y * it->z; szz += it->z * it->z;
-        mx  += it->x;   my += it->y;   mz += it->z;
+        sxx += double(it->x * it->x); sxy += double(it->x * it->y);
+        sxz += double(it->x * it->z); syy += double(it->y * it->y);
+        syz += double(it->y * it->z); szz += double(it->z * it->z);
+        mx  += double(it->x); my += double(it->y); mz += double(it->z);
     }
 
-    unsigned int nSize = _vPoints.size();
-    sxx = sxx - mx*mx/((double)nSize);
-    sxy = sxy - mx*my/((double)nSize);
-    sxz = sxz - mx*mz/((double)nSize);
-    syy = syy - my*my/((double)nSize);
-    syz = syz - my*mz/((double)nSize);
-    szz = szz - mz*mz/((double)nSize);
+    size_t nSize = _vPoints.size();
+    sxx = sxx - mx*mx/(double(nSize));
+    sxy = sxy - mx*my/(double(nSize));
+    sxz = sxz - mx*mz/(double(nSize));
+    syy = syy - my*my/(double(nSize));
+    syz = syz - my*mz/(double(nSize));
+    szz = szz - mz*mz/(double(nSize));
 
 #if defined(FC_USE_EIGEN)
     Eigen::Matrix3d covMat = Eigen::Matrix3d::Zero();
@@ -224,11 +211,11 @@ float PlaneFit::Fit()
             return FLOAT_MAX;
     }
 
-    _vDirU.Set((float)U.X(), (float)U.Y(), (float)U.Z());
-    _vDirV.Set((float)V.X(), (float)V.Y(), (float)V.Z());
-    _vDirW.Set((float)W.X(), (float)W.Y(), (float)W.Z());
-    _vBase.Set((float)(mx/nSize), (float)(my/nSize), (float)(mz/nSize));
-    float sigma = (float)W.Dot(akMat * W);
+    _vDirU.Set(float(U.X()), float(U.Y()), float(U.Z()));
+    _vDirV.Set(float(V.X()), float(V.Y()), float(V.Z()));
+    _vDirW.Set(float(W.X()), float(W.Y()), float(W.Z()));
+    _vBase.Set(float(mx/nSize), float(my/nSize), float(mz/nSize));
+    float sigma = float(W.Dot(akMat * W));
 #endif
 
     // In case sigma is nan
@@ -308,7 +295,7 @@ float PlaneFit::GetStdDeviation() const
     float fSumXi = 0.0f, fSumXi2 = 0.0f,
           fMean  = 0.0f, fDist   = 0.0f;
 
-    float ulPtCt = (float)CountPoints();
+    float ulPtCt = float(CountPoints());
     std::list< Base::Vector3f >::const_iterator cIt;
 
     for (cIt = _vPoints.begin(); cIt != _vPoints.end(); ++cIt) {
@@ -318,7 +305,7 @@ float PlaneFit::GetStdDeviation() const
     }
 
     fMean = (1.0f / ulPtCt) * fSumXi;
-    return (float)sqrt((ulPtCt / (ulPtCt - 3.0)) * ((1.0 / ulPtCt) * fSumXi2 - fMean * fMean));
+    return sqrt((ulPtCt / (ulPtCt - 3.0f)) * ((1.0f / ulPtCt) * fSumXi2 - fMean * fMean));
 }
 
 float PlaneFit::GetSignedStdDeviation() const
@@ -334,7 +321,7 @@ float PlaneFit::GetSignedStdDeviation() const
     float fMinDist = FLOAT_MAX;
     float fFactor;
 
-    float ulPtCt = (float)CountPoints();
+    float ulPtCt = float(CountPoints());
     Base::Vector3f clGravity, clPt;
     std::list<Base::Vector3f>::const_iterator cIt;
     for (cIt = _vPoints.begin(); cIt != _vPoints.end(); ++cIt)
@@ -359,7 +346,7 @@ float PlaneFit::GetSignedStdDeviation() const
 
     fMean = 1.0f / ulPtCt * fSumXi;
 
-    return fFactor * (float)sqrt((ulPtCt / (ulPtCt - 3.0)) * ((1.0 / ulPtCt) * fSumXi2 - fMean * fMean));
+    return fFactor * sqrt((ulPtCt / (ulPtCt - 3.0f)) * ((1.0f / ulPtCt) * fSumXi2 - fMean * fMean));
 }
 
 void PlaneFit::ProjectToPlane ()
@@ -396,14 +383,14 @@ std::vector<Base::Vector3f> PlaneFit::GetLocalPoints() const
 {
     std::vector<Base::Vector3f> localPoints;
     if (_bIsFitted && _fLastResult < FLOAT_MAX) {
-        Base::Vector3d bs(this->_vBase.x,this->_vBase.y,this->_vBase.z);
-        Base::Vector3d ex(this->_vDirU.x,this->_vDirU.y,this->_vDirU.z);
-        Base::Vector3d ey(this->_vDirV.x,this->_vDirV.y,this->_vDirV.z);
-        Base::Vector3d ez(this->_vDirW.x,this->_vDirW.y,this->_vDirW.z);
+        Base::Vector3d bs = Base::convertTo<Base::Vector3d>(this->_vBase);
+        Base::Vector3d ex = Base::convertTo<Base::Vector3d>(this->_vDirU);
+        Base::Vector3d ey = Base::convertTo<Base::Vector3d>(this->_vDirV);
+      //Base::Vector3d ez = Base::convertTo<Base::Vector3d>(this->_vDirW);
 
         localPoints.insert(localPoints.begin(), _vPoints.begin(), _vPoints.end());
         for (std::vector<Base::Vector3f>::iterator it = localPoints.begin(); it != localPoints.end(); ++it) {
-            Base::Vector3d clPoint(it->x,it->y,it->z);
+            Base::Vector3d clPoint = Base::convertTo<Base::Vector3d>(*it);
             clPoint.TransformToCoordinateSystem(bs, ex, ey);
             it->Set(static_cast<float>(clPoint.x), static_cast<float>(clPoint.y), static_cast<float>(clPoint.z));
         }
@@ -426,9 +413,9 @@ bool QuadraticFit::GetCurvatureInfo(double x, double y, double z,
         FunctionContainer  clFuncCont( _fCoeff );
         bResult = clFuncCont.CurvatureInfo( x, y, z, rfCurv0, rfCurv1, Dir0, Dir1, dDistance );
 
-        dDistance = clFuncCont.GetGradient( x, y, z ).Length();
-        Convert( Dir0, rkDir0 );
-        Convert( Dir1, rkDir1 );
+        dDistance = double(clFuncCont.GetGradient( x, y, z ).Length());
+        rkDir0 = Base::convertTo<Base::Vector3f>(Dir0);
+        rkDir1 = Base::convertTo<Base::Vector3f>(Dir1);
     }
 
     return bResult;
@@ -458,7 +445,7 @@ double QuadraticFit::GetCoeff(unsigned long ulIndex) const
     if( _bIsFitted )
         return _fCoeff[ ulIndex ];
     else
-        return FLOAT_MAX;
+        return double(FLOAT_MAX);
 }
 
 float QuadraticFit::Fit()
@@ -503,9 +490,9 @@ void QuadraticFit::CalcEigenValues(double &dLambda1, double &dLambda2, double &d
      *
      */
 
-    Wm4::Matrix3<double>  akMat(_fCoeff[4],       _fCoeff[7]/2.0f, _fCoeff[8]/2.0f,
-                                _fCoeff[7]/2.0f,  _fCoeff[5],      _fCoeff[9]/2.0f,
-                                _fCoeff[8]/2.0f,  _fCoeff[9]/2.0f, _fCoeff[6]       );
+    Wm4::Matrix3<double>  akMat(_fCoeff[4],      _fCoeff[7]/2.0, _fCoeff[8]/2.0,
+                                _fCoeff[7]/2.0,  _fCoeff[5],     _fCoeff[9]/2.0,
+                                _fCoeff[8]/2.0,  _fCoeff[9]/2.0, _fCoeff[6]       );
 
     Wm4::Matrix3<double> rkRot, rkDiag;
     akMat.EigenDecomposition( rkRot, rkDiag );
@@ -514,9 +501,9 @@ void QuadraticFit::CalcEigenValues(double &dLambda1, double &dLambda2, double &d
     Wm4::Vector3<double> vEigenV = rkRot.GetColumn(1);
     Wm4::Vector3<double> vEigenW = rkRot.GetColumn(2);
 
-    Convert( vEigenU, clEV1 );
-    Convert( vEigenV, clEV2 );
-    Convert( vEigenW, clEV3 );
+    clEV1 = Base::convertTo<Base::Vector3f>(vEigenU);
+    clEV2 = Base::convertTo<Base::Vector3f>(vEigenV);
+    clEV3 = Base::convertTo<Base::Vector3f>(vEigenW);
 
     dLambda1 = rkDiag[0][0];
     dLambda2 = rkDiag[1][1];
@@ -533,14 +520,14 @@ void QuadraticFit::CalcZValues( double x, double y, double &dZ1, double &dZ2 ) c
                    4*_fCoeff[6]*_fCoeff[7]*x*y-4*_fCoeff[6]*_fCoeff[4]*x*x-4*_fCoeff[6]*_fCoeff[5]*y*y;
 
     if (fabs( _fCoeff[6] ) < 0.000005) {
-        dZ1 = FLOAT_MAX; 
-        dZ2 = FLOAT_MAX; 
+        dZ1 = double(FLOAT_MAX);
+        dZ2 = double(FLOAT_MAX);
         return;
     }
 
-    if (dDisk < 0.0f) {
-        dZ1 = FLOAT_MAX; 
-        dZ2 = FLOAT_MAX; 
+    if (dDisk < 0.0) {
+        dZ1 = double(FLOAT_MAX);
+        dZ2 = double(FLOAT_MAX);
         return;
     }
     else
@@ -555,16 +542,16 @@ void QuadraticFit::CalcZValues( double x, double y, double &dZ1, double &dZ2 ) c
 SurfaceFit::SurfaceFit()
    : PlaneFit()
 {
-    _fCoeff[0] = 0.0f;
-    _fCoeff[1] = 0.0f;
-    _fCoeff[2] = 0.0f;
-    _fCoeff[3] = 0.0f;
-    _fCoeff[4] = 0.0f;
-    _fCoeff[5] = 0.0f;
-    _fCoeff[6] = 0.0f;
-    _fCoeff[7] = 0.0f;
-    _fCoeff[8] = 0.0f;
-    _fCoeff[9] = 0.0f;
+    _fCoeff[0] = 0.0;
+    _fCoeff[1] = 0.0;
+    _fCoeff[2] = 0.0;
+    _fCoeff[3] = 0.0;
+    _fCoeff[4] = 0.0;
+    _fCoeff[5] = 0.0;
+    _fCoeff[6] = 0.0;
+    _fCoeff[7] = 0.0;
+    _fCoeff[8] = 0.0;
+    _fCoeff[9] = 0.0;
 }
 
 float SurfaceFit::Fit()
@@ -572,7 +559,7 @@ float SurfaceFit::Fit()
     float fResult = FLOAT_MAX;
 
     if (CountPoints() > 0) {
-        fResult = (float) PolynomFit();
+        fResult = float(PolynomFit());
         _fLastResult = fResult;
 
         _bIsFitted = true;
@@ -591,9 +578,9 @@ bool SurfaceFit::GetCurvatureInfo(double x, double y, double z, double &rfCurv0,
         FunctionContainer  clFuncCont( _fCoeff );
         bResult = clFuncCont.CurvatureInfo( x, y, z, rfCurv0, rfCurv1, Dir0, Dir1, dDistance );
 
-        dDistance = clFuncCont.GetGradient( x, y, z ).Length();
-        Convert( Dir0, rkDir0 );
-        Convert( Dir1, rkDir1 );
+        dDistance = double(clFuncCont.GetGradient( x, y, z ).Length());
+        rkDir0 = Base::convertTo<Base::Vector3f>(Dir0);
+        rkDir1 = Base::convertTo<Base::Vector3f>(Dir1);
     }
 
     return bResult;
@@ -614,13 +601,13 @@ bool SurfaceFit::GetCurvatureInfo(double x, double y, double z, double &rfCurv0,
 
 double SurfaceFit::PolynomFit()
 {
-    if (PlaneFit::Fit() == FLOAT_MAX)
-        return FLOAT_MAX;
+    if (PlaneFit::Fit() >= FLOAT_MAX)
+        return double(FLOAT_MAX);
 
-    Base::Vector3d bs(this->_vBase.x,this->_vBase.y,this->_vBase.z);
-    Base::Vector3d ex(this->_vDirU.x,this->_vDirU.y,this->_vDirU.z);
-    Base::Vector3d ey(this->_vDirV.x,this->_vDirV.y,this->_vDirV.z);
-    Base::Vector3d ez(this->_vDirW.x,this->_vDirW.y,this->_vDirW.z);
+    Base::Vector3d bs = Base::convertTo<Base::Vector3d>(this->_vBase);
+    Base::Vector3d ex = Base::convertTo<Base::Vector3d>(this->_vDirU);
+    Base::Vector3d ey = Base::convertTo<Base::Vector3d>(this->_vDirV);
+  //Base::Vector3d ez = Base::convertTo<Base::Vector3d>(this->_vDirW);
 
     // A*x = b
     // See also www.cs.jhu.edu/~misha/Fall05/10.23.05.pdf
@@ -647,7 +634,7 @@ double SurfaceFit::PolynomFit()
 
     double dW2 = 0;
     for (std::list<Base::Vector3f>::const_iterator it = _vPoints.begin(); it != _vPoints.end(); ++it) {
-        Base::Vector3d clPoint(it->x,it->y,it->z);
+        Base::Vector3d clPoint = Base::convertTo<Base::Vector3d>(*it);
         clPoint.TransformToCoordinateSystem(bs, ex, ey);
         transform.push_back(clPoint);
         double dU = clPoint.x;
@@ -771,7 +758,7 @@ double SurfaceFit::PolynomFit()
         sigma = sqrt(sigma/_vPoints.size());
 
     _fLastResult = static_cast<float>(sigma);
-    return _fLastResult;
+    return double(_fLastResult);
 }
 
 double SurfaceFit::Value(double x, double y) const
@@ -795,7 +782,170 @@ void SurfaceFit::GetCoefficients(double& a,double& b,double& c,double& d,double&
     f = _fCoeff[0];
 }
 
+// -------------------------------------------------------------------------------
+
+CylinderFit::CylinderFit()
+  : _vBase(0,0,0)
+  , _vAxis(0,0,1)
+  , _fRadius(0)
+{
+}
+
+CylinderFit::~CylinderFit()
+{
+}
+
+float CylinderFit::Fit()
+{
+    if (CountPoints() < 7)
+        return FLOAT_MAX;
+    _bIsFitted = true;
+
+    // TODO
+
+    _fLastResult = 0;
+    return _fLastResult;
+}
+
+float CylinderFit::GetRadius() const
+{
+    return _fRadius;
+}
+
+Base::Vector3f CylinderFit::GetBase() const
+{
+    if (_bIsFitted)
+        return _vBase;
+    else
+        return Base::Vector3f();
+}
+
+Base::Vector3f CylinderFit::GetAxis() const
+{
+    if (_bIsFitted)
+        return _vAxis;
+    else
+        return Base::Vector3f();
+}
+
+float CylinderFit::GetDistanceToCylinder(const Base::Vector3f &rcPoint) const
+{
+    float fResult = FLOAT_MAX;
+    if (_bIsFitted)
+        fResult = rcPoint.DistanceToLine(_vBase, _vAxis) - _fRadius;
+    return fResult;
+}
+
+float CylinderFit::GetStdDeviation() const
+{
+    // Mean: M=(1/N)*SUM Xi
+    // Variance: VAR=(N/N-3)*[(1/N)*SUM(Xi^2)-M^2]
+    // Standard deviation: SD=SQRT(VAR)
+    // Standard error of the mean: SE=SD/SQRT(N)
+    if (!_bIsFitted)
+        return FLOAT_MAX;
+
+    float fSumXi = 0.0f, fSumXi2 = 0.0f,
+          fMean  = 0.0f, fDist   = 0.0f;
+
+    float ulPtCt = float(CountPoints());
+    std::list< Base::Vector3f >::const_iterator cIt;
+
+    for (cIt = _vPoints.begin(); cIt != _vPoints.end(); ++cIt) {
+        fDist = GetDistanceToCylinder( *cIt );
+        fSumXi  += fDist;
+        fSumXi2 += ( fDist * fDist );
+    }
+
+    fMean = (1.0f / ulPtCt) * fSumXi;
+    return sqrt((ulPtCt / (ulPtCt - 3.0f)) * ((1.0f / ulPtCt) * fSumXi2 - fMean * fMean));
+}
+
+void CylinderFit::ProjectToCylinder()
+{
+    Base::Vector3f cBase(GetBase());
+    Base::Vector3f cAxis(GetAxis());
+
+    for (std::list< Base::Vector3f >::iterator it = _vPoints.begin(); it != _vPoints.end(); ++it) {
+        Base::Vector3f& cPnt = *it;
+        if (cPnt.DistanceToLine(cBase, cAxis) > 0) {
+            Base::Vector3f proj;
+            cBase.ProjectToPlane(cPnt, cAxis, proj);
+            Base::Vector3f diff = cPnt - proj;
+            diff.Normalize();
+            cPnt = proj + diff * _fRadius;
+        }
+        else {
+            // Point is on the cylinder axis, so it can be moved in
+            // any direction perpendicular to the cylinder axis
+            Base::Vector3f cMov(cPnt);
+            do {
+                float x = (float(rand()) / float(RAND_MAX));
+                float y = (float(rand()) / float(RAND_MAX));
+                float z = (float(rand()) / float(RAND_MAX));
+                cMov.Move(x,y,z);
+            }
+            while (cMov.DistanceToLine(cBase, cAxis) == 0);
+
+            Base::Vector3f proj;
+            cMov.ProjectToPlane(cPnt, cAxis, proj);
+            Base::Vector3f diff = cPnt - proj;
+            diff.Normalize();
+            cPnt = proj + diff * _fRadius;
+        }
+    }
+}
+
 // -----------------------------------------------------------------------------
+
+SphereFit::SphereFit()
+  : _vCenter(0,0,0)
+  , _fRadius(0)
+{
+}
+
+SphereFit::~SphereFit()
+{
+
+}
+
+float SphereFit::GetRadius() const
+{
+    if (_bIsFitted)
+        return _fRadius;
+    else
+        return FLOAT_MAX;
+}
+
+Base::Vector3f SphereFit::GetCenter() const
+{
+    if (_bIsFitted)
+        return _vCenter;
+    else
+        return Base::Vector3f();
+}
+
+float SphereFit::Fit()
+{
+    return FLOAT_MAX;
+}
+
+float SphereFit::GetDistanceToSphere(const Base::Vector3f &) const
+{
+    return FLOAT_MAX;
+}
+
+float SphereFit::GetStdDeviation() const
+{
+    return FLOAT_MAX;
+}
+
+void SphereFit::ProjectToSphere()
+{
+
+}
+
+// -------------------------------------------------------------------------------
 
 PolynomialFit::PolynomialFit()
 {
@@ -820,7 +970,7 @@ float PolynomialFit::Fit()
     }
 
     try {
-        float* coeff = Wm4::PolyFit3<float>(_vPoints.size(), &(x[0]), &(y[0]), &(z[0]), 2 , 2);
+        float* coeff = Wm4::PolyFit3<float>(_vPoints.size(), &(x[0]), &(y[0]), &(z[0]), 2, 2);
         for (int i=0; i<9; i++)
             _fCoeff[i] = coeff[i];
     }

@@ -32,6 +32,44 @@
 #include <string>
 #include <boost/signals2.hpp>
 #include <QString>
+#include <QObject>
+
+#if (QT_VERSION < 0x050300)
+class QSignalBlocker
+{
+public:
+    QSignalBlocker(QObject *object)
+      : object(object)
+      , blocked(object && object->blockSignals(true))
+      , inhibited(false)
+    {
+    }
+    ~QSignalBlocker()
+    {
+        if (object && !inhibited)
+            object->blockSignals(blocked);
+    }
+    void reblock()
+    {
+        if (object)
+            object->blockSignals(true);
+        inhibited = false;
+    }
+    void unblock()
+    {
+        if (object)
+            object->blockSignals(blocked);
+        inhibited = true;
+    }
+
+private:
+    QObject *object;
+    bool blocked;
+    bool inhibited;
+};
+#endif
+
+// ----------------------------------------------------------------------------
 
 namespace Base
 {
@@ -149,6 +187,33 @@ private:
 
 // ----------------------------------------------------------------------------
 
+template<typename Flag=bool>
+struct FlagToggler {
+
+    Flag &flag;
+    bool toggled;
+
+    FlagToggler(Flag &_flag)
+        :flag(_flag),toggled(true)
+    {
+        flag = !flag;
+    }
+
+    FlagToggler(Flag &_flag, Flag check)
+        :flag(_flag),toggled(check==_flag)
+    {
+        if(toggled)
+            flag = !flag;
+    }
+
+    ~FlagToggler() {
+        if(toggled)
+            flag = !flag;
+    }
+};
+
+// ----------------------------------------------------------------------------
+
 template<typename Status, class Object>
 class ObjectStatusLocker
 {
@@ -175,6 +240,23 @@ public:
 private:
     bool& lock;
     bool old_value;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T>
+class BitsetLocker
+{
+public:
+    BitsetLocker(T& flags, std::size_t flag, bool value = true) 
+        : flags(flags), flag(flag)
+    { oldValue = flags.test(flag); flags.set(flag,value); }
+    ~BitsetLocker()
+    { flags.set(flag,oldValue); }
+private:
+    T &flags;
+    std::size_t flag;
+    bool oldValue;
 };
 
 // ----------------------------------------------------------------------------

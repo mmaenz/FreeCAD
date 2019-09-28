@@ -32,6 +32,13 @@
 #include "Quantity.h"
 #include "Exception.h"
 #include "UnitsApi.h"
+#include "Console.h"
+#include <boost/math/special_functions/fpclassify.hpp>
+
+/** \defgroup Units Units system
+    \ingroup BASE
+    \brief The quantities and units system enables FreeCAD to work transparently with many different units
+*/
 
 // suppress annoying warnings from generated source files
 #ifdef _MSC_VER
@@ -49,7 +56,7 @@ int QuantityFormat::defaultDenominator = 8; // for 1/8"
 
 
 QuantityFormat::QuantityFormat()
-  : option(static_cast<NumberOption>(OmitGroupSeparator | RejectGroupSeparator))
+  : option(OmitGroupSeparator | RejectGroupSeparator)
   , format(Fixed)
   , precision(UnitsApi::getDecimals())
   , denominator(defaultDenominator)
@@ -81,7 +88,7 @@ double Quantity::getValueAs(const Quantity &q)const
 
 bool Quantity::operator ==(const Quantity& that) const
 {
-    return (this->_Value == that._Value) && (this->_Unit == that._Unit) ;
+    return (this->_Value == that._Value) && (this->_Unit == that._Unit);
 }
 
 bool Quantity::operator <(const Quantity& that) const
@@ -142,7 +149,7 @@ Quantity Quantity::pow(const Quantity &p) const
         throw Base::UnitsMismatchError("Quantity::pow(): exponent must not have a unit");
     return Quantity(
         std::pow(this->_Value, p._Value),
-        this->_Unit.pow((short)p._Value)
+        this->_Unit.pow(static_cast<signed char>(p._Value))
         );
 }
 
@@ -208,23 +215,24 @@ QString Quantity::getUserString(double& factor, QString& unitString) const
 /// true if it has a number without a unit
 bool Quantity::isDimensionless(void)const
 {
-    return _Value != DOUBLE_MIN && _Unit.isEmpty();
+    return isValid() && _Unit.isEmpty();
 }
 
 // true if it has a number and a valid unit
 bool Quantity::isQuantity(void)const
 {
-    return _Value != DOUBLE_MIN && !_Unit.isEmpty();
+    return isValid() && !_Unit.isEmpty();
 }
+
 // true if it has a number with or without a unit
 bool Quantity::isValid(void)const
 {
-    return _Value != DOUBLE_MIN ;
+    return !boost::math::isnan(_Value);
 }
 
 void Quantity::setInvalid(void)
 {
-    _Value = DOUBLE_MIN ;
+    _Value = std::numeric_limits<double>::quiet_NaN();
 }
 
 // === Predefined types =====================================================
@@ -305,6 +313,8 @@ Quantity Quantity::WattSecond       (1e+6          ,Unit(2,1,-2));  // Joule (kg
 Quantity Quantity::KMH              (277.778       ,Unit(1,0,-1));  // km/h
 Quantity Quantity::MPH              (447.04        ,Unit(1,0,-1));  // Mile/h
 
+Quantity Quantity::AngMinute        (1.0/60.0      ,Unit(0,0,0,0,0,0,0,1)); // angular minute
+Quantity Quantity::AngSecond        (1.0/3600.0    ,Unit(0,0,0,0,0,0,0,1)); // angular minute
 Quantity Quantity::Degree           (1.0           ,Unit(0,0,0,0,0,0,0,1)); // degree         (internal standard angle)
 Quantity Quantity::Radian           (180/M_PI      ,Unit(0,0,0,0,0,0,0,1)); // radian
 Quantity Quantity::Gon              (360.0/400.0   ,Unit(0,0,0,0,0,0,0,1)); // gon
@@ -339,7 +349,7 @@ double num_change(char* yytext,char dez_delim,char grp_delim)
     
     ret_val = atof( temp ); 
     return ret_val;
-};
+}
 
 // error func
 void Quantity_yyerror(char *errorinfo)

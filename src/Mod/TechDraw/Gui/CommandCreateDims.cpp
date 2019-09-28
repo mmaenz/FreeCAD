@@ -108,7 +108,7 @@ char* _edgeTypeToText(int e);
 
 // this is deprecated. use individual add dimension commands.
 
-DEF_STD_CMD_A(CmdTechDrawNewDimension);
+DEF_STD_CMD_A(CmdTechDrawNewDimension)
 
 CmdTechDrawNewDimension::CmdTechDrawNewDimension()
   : Command("TechDraw_NewDimension")
@@ -200,7 +200,7 @@ void CmdTechDrawNewDimension::activated(int iMsg)
         subs.push_back(SubNames[1]);
     } else {
         QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Incorrect Selection"),
-                                                   QObject::tr("Can't make a Dimension from this selection"));
+                                                   QObject::tr("Can not make a Dimension from this selection"));
         return;
     }
 
@@ -211,7 +211,7 @@ void CmdTechDrawNewDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -235,7 +235,7 @@ bool CmdTechDrawNewDimension::isActive(void)
 // TechDraw_NewRadiusDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewRadiusDimension);
+DEF_STD_CMD_A(CmdTechDrawNewRadiusDimension)
 
 CmdTechDrawNewRadiusDimension::CmdTechDrawNewRadiusDimension()
   : Command("TechDraw_NewRadiusDimension")
@@ -283,12 +283,33 @@ void CmdTechDrawNewRadiusDimension::activated(int iMsg)
     if (edgeType == isCircle) {
         objs.push_back(objFeat);
         subs.push_back(SubNames[0]);
+    } else if (edgeType == isEllipse) {
+        QMessageBox::StandardButton result =
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Ellipse Curve Warning"),
+                             QObject::tr("Selected edge is an Ellipse.  Radius will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (result == QMessageBox::Ok) {
+            objs.push_back(objFeat);
+            subs.push_back(SubNames[0]);
+        } else {
+            return;
+        }
     } else if (edgeType == isBSplineCircle) {
         QMessageBox::StandardButton result =
-        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Selection Warning"),
-                                                   QObject::tr("Selected edge is a BSpline.  Radius will be approximate."),
-                                                   QMessageBox::Ok | QMessageBox::Cancel,
-                                                   QMessageBox::Cancel);
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("BSpline Curve Warning"),
+                             QObject::tr("Selected edge is a BSpline.  Radius will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (result == QMessageBox::Ok) {
+            objs.push_back(objFeat);
+            subs.push_back(SubNames[0]);
+        } else {
+            return;
+        }
+    } else if (edgeType == isBSpline) {
+        QMessageBox::StandardButton result =
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("BSpline Curve Warning"),
+                             QObject::tr("Selected edge is a BSpline.  Radius will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
         if (result == QMessageBox::Ok) {
             objs.push_back(objFeat);
             subs.push_back(SubNames[0]);
@@ -310,13 +331,14 @@ void CmdTechDrawNewRadiusDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewRadiusDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewRadiusDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
     doCommand(Doc,"App.activeDocument().%s.addView(App.activeDocument().%s)",PageName.c_str(),FeatName.c_str());
 
     commitCommand();
+
     dim->recomputeFeature();
 
     //Horrible hack to force Tree update
@@ -335,7 +357,7 @@ bool CmdTechDrawNewRadiusDimension::isActive(void)
 // TechDraw_NewDiameterDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewDiameterDimension);
+DEF_STD_CMD_A(CmdTechDrawNewDiameterDimension)
 
 CmdTechDrawNewDiameterDimension::CmdTechDrawNewDiameterDimension()
   : Command("TechDraw_NewDiameterDimension")
@@ -383,12 +405,33 @@ void CmdTechDrawNewDiameterDimension::activated(int iMsg)
     if (edgeType == isCircle) {
         objs.push_back(objFeat);
         subs.push_back(SubNames[0]);
+    } else if (edgeType == isEllipse) {
+        QMessageBox::StandardButton result =
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Ellipse Curve Warning"),
+                             QObject::tr("Selected edge is an Ellipse.  Diameter will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (result == QMessageBox::Ok) {
+            objs.push_back(objFeat);
+            subs.push_back(SubNames[0]);
+        } else {
+            return;
+        }
     } else if (edgeType == isBSplineCircle) {
         QMessageBox::StandardButton result =
-        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Selection Warning"),
-                                                   QObject::tr("Selected edge is a BSpline.  Diameter will be approximate."),
-                                                   QMessageBox::Ok | QMessageBox::Cancel,
-                                                   QMessageBox::Cancel);
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("BSpline Curve Warning"),
+                             QObject::tr("Selected edge is a BSpline.  Diameter will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (result == QMessageBox::Ok) {
+            objs.push_back(objFeat);
+            subs.push_back(SubNames[0]);
+        } else {
+            return;
+        }
+    } else if (edgeType == isBSpline) {
+        QMessageBox::StandardButton result =
+        QMessageBox::warning(Gui::getMainWindow(), QObject::tr("BSpline Curve Warning"),
+                             QObject::tr("Selected edge is a BSpline.  Diameter will be approximate. Continue?"),
+                             QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
         if (result == QMessageBox::Ok) {
             objs.push_back(objFeat);
             subs.push_back(SubNames[0]);
@@ -410,7 +453,7 @@ void CmdTechDrawNewDiameterDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewDiameterDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewDiameterDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -435,7 +478,7 @@ bool CmdTechDrawNewDiameterDimension::isActive(void)
 // TechDraw_NewLengthDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewLengthDimension);
+DEF_STD_CMD_A(CmdTechDrawNewLengthDimension)
 
 CmdTechDrawNewLengthDimension::CmdTechDrawNewLengthDimension()
   : Command("TechDraw_NewLengthDimension")
@@ -519,7 +562,7 @@ void CmdTechDrawNewLengthDimension::activated(int iMsg)
                                                        , "Distance");
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewLengthDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewLengthDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -548,7 +591,7 @@ bool CmdTechDrawNewLengthDimension::isActive(void)
 // TechDraw_NewDistanceXDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewDistanceXDimension);
+DEF_STD_CMD_A(CmdTechDrawNewDistanceXDimension)
 
 CmdTechDrawNewDistanceXDimension::CmdTechDrawNewDistanceXDimension()
   : Command("TechDraw_NewDistanceXDimension")
@@ -632,7 +675,7 @@ void CmdTechDrawNewDistanceXDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewDistanceXDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewDistanceXDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -661,7 +704,7 @@ bool CmdTechDrawNewDistanceXDimension::isActive(void)
 // TechDraw_NewDistanceYDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewDistanceYDimension);
+DEF_STD_CMD_A(CmdTechDrawNewDistanceYDimension)
 
 CmdTechDrawNewDistanceYDimension::CmdTechDrawNewDistanceYDimension()
   : Command("TechDraw_NewDistanceYDimension")
@@ -744,7 +787,7 @@ void CmdTechDrawNewDistanceYDimension::activated(int iMsg)
                                                        ,"DistanceY");
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewDistanceYDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewDistanceYDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -773,7 +816,7 @@ bool CmdTechDrawNewDistanceYDimension::isActive(void)
 // TechDraw_NewAngleDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewAngleDimension);
+DEF_STD_CMD_A(CmdTechDrawNewAngleDimension)
 
 CmdTechDrawNewAngleDimension::CmdTechDrawNewAngleDimension()
   : Command("TechDraw_NewAngleDimension")
@@ -836,7 +879,7 @@ void CmdTechDrawNewAngleDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewAngleDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewAngleDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -861,7 +904,7 @@ bool CmdTechDrawNewAngleDimension::isActive(void)
 // TechDraw_NewAngle3PtDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawNewAngle3PtDimension);
+DEF_STD_CMD_A(CmdTechDrawNewAngle3PtDimension)
 
 CmdTechDrawNewAngle3PtDimension::CmdTechDrawNewAngle3PtDimension()
   : Command("TechDraw_NewAngle3PtDimension")
@@ -914,7 +957,7 @@ void CmdTechDrawNewAngle3PtDimension::activated(int iMsg)
         subs.push_back(SubNames[2]);
     } else {
         QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Incorrect Selection"),
-                                                   QObject::tr("Need three points to make an 3 point Angle Dimension"));
+                                                   QObject::tr("Need three points to make a 3 point Angle Dimension"));
         return;
     }
 
@@ -925,7 +968,7 @@ void CmdTechDrawNewAngle3PtDimension::activated(int iMsg)
 
     dim = dynamic_cast<TechDraw::DrawViewDimension *>(getDocument()->getObject(FeatName.c_str()));
     if (!dim) {
-        throw Base::Exception("CmdTechDrawNewAngle3PtDimension - dim not found\n");
+        throw Base::TypeError("CmdTechDrawNewAngle3PtDimension - dim not found\n");
     }
     dim->References2D.setValues(objs, subs);
 
@@ -953,7 +996,7 @@ bool CmdTechDrawNewAngle3PtDimension::isActive(void)
 // TechDraw_LinkDimension
 //===========================================================================
 
-DEF_STD_CMD_A(CmdTechDrawLinkDimension);
+DEF_STD_CMD_A(CmdTechDrawLinkDimension)
 
 CmdTechDrawLinkDimension::CmdTechDrawLinkDimension()
   : Command("TechDraw_LinkDimension")
@@ -980,7 +1023,8 @@ void CmdTechDrawLinkDimension::activated(int iMsg)
     if (!result)
         return;
 
-    std::vector<Gui::SelectionObject> selection = getSelection().getSelectionEx();
+    std::vector<Gui::SelectionObject> selection = getSelection().getSelectionEx(0,
+            App::DocumentObject::getClassTypeId(),0);
 
     App::DocumentObject* obj3D = 0;
     std::vector<App::DocumentObject*> parts;
@@ -988,13 +1032,11 @@ void CmdTechDrawLinkDimension::activated(int iMsg)
 
     std::vector<Gui::SelectionObject>::iterator itSel = selection.begin();
     for (; itSel != selection.end(); itSel++)  {
-        if ((*itSel).getObject()->isDerivedFrom(Part::Feature::getClassTypeId())) {
-            obj3D = ((*itSel).getObject());
-            std::vector<std::string> subList = (*itSel).getSubNames();
-            for (auto& s:subList) {
-                parts.push_back(obj3D);
-                subs.push_back(s);
-            }
+        obj3D = ((*itSel).getObject());
+        std::vector<std::string> subList = (*itSel).getSubNames();
+        for (auto& s:subList) {
+            parts.push_back(obj3D);
+            subs.push_back(s);
         }
     }
 
@@ -1079,7 +1121,7 @@ bool _checkDrawViewPart(Gui::Command* cmd) {
     if( !objFeat ) {
         QMessageBox::warning( Gui::getMainWindow(),
                               QObject::tr("Incorrect selection"),
-                              QObject::tr("No DrawViewPart in selection.") );
+                              QObject::tr("No View of a Part in selection.") );
         return false;
     }
     return true;
@@ -1096,7 +1138,7 @@ bool _checkPartFeature(Gui::Command* cmd) {
     }
     if(!result) {
         QMessageBox::warning(Gui::getMainWindow(), QObject::tr("Incorrect selection"),
-                             QObject::tr("No DrawViewPart in selection."));
+                             QObject::tr("No Feature with Shape in selection."));
     }
     return result;
 }
@@ -1115,18 +1157,18 @@ int _isValidSingleEdge(Gui::Command* cmd) {
     if (SubNames.size() == 1) {                                                 //only 1 subshape selected
         if (TechDraw::DrawUtil::getGeomTypeFromName(SubNames[0]) == "Edge") {                                //the Name starts with "Edge"
             int GeoId( TechDraw::DrawUtil::getIndexFromName(SubNames[0]) );
-            TechDrawGeometry::BaseGeom* geom = objFeat->getProjEdgeByIndex(GeoId);
+            TechDraw::BaseGeom* geom = objFeat->getGeomByIndex(GeoId);
             if (!geom) {
                 Base::Console().Error("Logic Error: no geometry for GeoId: %d\n",GeoId);
                 return isInvalid;
             }
 
-            if(geom->geomType == TechDrawGeometry::GENERIC) {
-                TechDrawGeometry::Generic* gen1 = static_cast<TechDrawGeometry::Generic *>(geom);
+            if(geom->geomType == TechDraw::GENERIC) {
+                TechDraw::Generic* gen1 = static_cast<TechDraw::Generic *>(geom);
                 if(gen1->points.size() > 2) {                                   //the edge is a polyline
                     return isInvalid;
                 }
-                Base::Vector2d line = gen1->points.at(1) - gen1->points.at(0);
+                Base::Vector3d line = gen1->points.at(1) - gen1->points.at(0);
                 if(fabs(line.y) < FLT_EPSILON ) {
                     edgeType = isHorizontal;
                 } else if(fabs(line.x) < FLT_EPSILON) {
@@ -1134,14 +1176,14 @@ int _isValidSingleEdge(Gui::Command* cmd) {
                 } else {
                     edgeType = isDiagonal;
                 }
-            } else if (geom->geomType == TechDrawGeometry::CIRCLE ||
-                       geom->geomType == TechDrawGeometry::ARCOFCIRCLE ) {
+            } else if (geom->geomType == TechDraw::CIRCLE ||
+                       geom->geomType == TechDraw::ARCOFCIRCLE ) {
                 edgeType = isCircle;
-            } else if (geom->geomType == TechDrawGeometry::ELLIPSE ||
-                       geom->geomType == TechDrawGeometry::ARCOFELLIPSE) {
+            } else if (geom->geomType == TechDraw::ELLIPSE ||
+                       geom->geomType == TechDraw::ARCOFELLIPSE) {
                 edgeType = isEllipse;
-            } else if (geom->geomType == TechDrawGeometry::BSPLINE) {
-                TechDrawGeometry::BSpline* spline = static_cast<TechDrawGeometry::BSpline*>(geom);
+            } else if (geom->geomType == TechDraw::BSPLINE) {
+                TechDraw::BSpline* spline = static_cast<TechDraw::BSpline*>(geom);
                 if (spline->isCircle()) {
                     edgeType = isBSplineCircle;
                 } else {
@@ -1192,23 +1234,23 @@ int _isValidEdgeToEdge(Gui::Command* cmd) {
             TechDraw::DrawUtil::getGeomTypeFromName(SubNames[1]) == "Edge") {
             int GeoId0( TechDraw::DrawUtil::getIndexFromName(SubNames[0]) );
             int GeoId1( TechDraw::DrawUtil::getIndexFromName(SubNames[1]) );
-            TechDrawGeometry::BaseGeom* geom0 = objFeat0->getProjEdgeByIndex(GeoId0);
-            TechDrawGeometry::BaseGeom* geom1 = objFeat0->getProjEdgeByIndex(GeoId1);
+            TechDraw::BaseGeom* geom0 = objFeat0->getGeomByIndex(GeoId0);
+            TechDraw::BaseGeom* geom1 = objFeat0->getGeomByIndex(GeoId1);
             if ((!geom0) || (!geom1)) {
                 Base::Console().Error("Logic Error: no geometry for GeoId: %d or GeoId: %d\n",GeoId0,GeoId1);
                 return isInvalid;
             }
 
-            if(geom0->geomType == TechDrawGeometry::GENERIC &&
-               geom1->geomType == TechDrawGeometry::GENERIC) {
-                TechDrawGeometry::Generic *gen0 = static_cast<TechDrawGeometry::Generic *>(geom0);
-                TechDrawGeometry::Generic *gen1 = static_cast<TechDrawGeometry::Generic *>(geom1);
+            if(geom0->geomType == TechDraw::GENERIC &&
+               geom1->geomType == TechDraw::GENERIC) {
+                TechDraw::Generic *gen0 = static_cast<TechDraw::Generic *>(geom0);
+                TechDraw::Generic *gen1 = static_cast<TechDraw::Generic *>(geom1);
                 if(gen0->points.size() > 2 ||
                    gen1->points.size() > 2) {                          //the edge is a polyline
                     return isInvalid;
                 }
-                Base::Vector2d line0 = gen0->points.at(1) - gen0->points.at(0);
-                Base::Vector2d line1 = gen1->points.at(1) - gen1->points.at(0);
+                Base::Vector3d line0 = gen0->points.at(1) - gen0->points.at(0);
+                Base::Vector3d line1 = gen1->points.at(1) - gen1->points.at(0);
                 double xprod = fabs(line0.x * line1.y - line0.y * line1.x);
                 if(xprod > FLT_EPSILON) {                              //edges are not parallel
                     return isAngle;
@@ -1237,8 +1279,8 @@ bool _isValidVertexToEdge(Gui::Command* cmd) {
     const std::vector<std::string> SubNames = selection[0].getSubNames();
     if(SubNames.size() == 2) {                                         //there are 2
         int eId,vId;
-        TechDrawGeometry::BaseGeom* e;
-        TechDrawGeometry::Vertex* v;
+        TechDraw::BaseGeom* e;
+        TechDraw::Vertex* v;
         if (TechDraw::DrawUtil::getGeomTypeFromName(SubNames[0]) == "Edge" &&
             TechDraw::DrawUtil::getGeomTypeFromName(SubNames[1]) == "Vertex") {
             eId = TechDraw::DrawUtil::getIndexFromName(SubNames[0]);
@@ -1250,13 +1292,13 @@ bool _isValidVertexToEdge(Gui::Command* cmd) {
         } else {
             return false;
         }
-        e = objFeat0->getProjEdgeByIndex(eId);
+        e = objFeat0->getGeomByIndex(eId);
         v = objFeat0->getProjVertexByIndex(vId);
         if ((!e) || (!v)) {
             Base::Console().Error("Logic Error: no geometry for GeoId: %d or GeoId: %d\n",eId,vId);
             return false;
         }
-        if (e->geomType != TechDrawGeometry::GENERIC)  {      //only vertex-line for now.
+        if (e->geomType != TechDraw::GENERIC)  {      //only vertex-line for now.
             return false;
         }
         result = true;

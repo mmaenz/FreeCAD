@@ -44,7 +44,7 @@
 
 using namespace ImageGui;
 
-DEF_STD_CMD(CmdImageOpen);
+DEF_STD_CMD(CmdImageOpen)
 
 CmdImageOpen::CmdImageOpen()
   : Command("Image_Open")
@@ -55,7 +55,7 @@ CmdImageOpen::CmdImageOpen()
     sToolTipText    = QT_TR_NOOP("Open image view");
     sWhatsThis      = "Image_Open";
     sStatusTip      = sToolTipText;
-    sPixmap         = "image-import";
+    sPixmap         = "Image_Open";
 }
 
 void CmdImageOpen::activated(int iMsg)
@@ -92,7 +92,7 @@ void CmdImageOpen::activated(int iMsg)
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-DEF_STD_CMD_A(CmdCreateImagePlane);
+DEF_STD_CMD_A(CmdCreateImagePlane)
 
 CmdCreateImagePlane::CmdCreateImagePlane()
     :Command("Image_CreateImagePlane")
@@ -103,7 +103,7 @@ CmdCreateImagePlane::CmdCreateImagePlane()
     sToolTipText    = QT_TR_NOOP("Create a planar image in the 3D space");
     sWhatsThis      = "Image_CreateImagePlane";
     sStatusTip      = sToolTipText;
-    sPixmap         = "image-import-to-plane";
+    sPixmap         = "Image_CreateImagePlane";
 }
 
 void CmdCreateImagePlane::activated(int iMsg)
@@ -166,7 +166,7 @@ bool CmdCreateImagePlane::isActive()
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-DEF_STD_CMD(CmdImageScaling);
+DEF_STD_CMD(CmdImageScaling)
 
 CmdImageScaling::CmdImageScaling()
   : Command("Image_Scaling")
@@ -177,7 +177,7 @@ CmdImageScaling::CmdImageScaling()
     sToolTipText    = QT_TR_NOOP("Image Scaling");
     sWhatsThis      = "Image_Scaling";
     sStatusTip      = sToolTipText;
-    sPixmap         = "image-scale";
+    sPixmap         = "Image_Scaling";
 }
 
 void CmdImageScaling::activated(int iMsg)

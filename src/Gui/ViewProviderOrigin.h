@@ -75,7 +75,7 @@ public:
     }
 
     /// Returns default size. Use this if it is not possible to determine appropriate size by other means
-    static double defaultSize() {return 10.;}
+    static double defaultSize();
 protected:
     virtual void onChanged(const App::Property* prop);
     virtual bool onDelete(const std::vector<std::string> &);
@@ -88,5 +88,5 @@ private:
 
 } // namespace Gui
 
-#endif // GUI_VIEWPROVIDER_DOCUMENTOBJECTGROUP_H
+#endif // GUI_VIEWPROVIDER_ViewProviderOrigin_H
 

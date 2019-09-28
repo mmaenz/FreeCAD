@@ -37,7 +37,7 @@
 using namespace Part;
 using namespace Attacher;
 
-EXTENSION_PROPERTY_SOURCE(Part::AttachExtension, App::DocumentObjectExtension);
+EXTENSION_PROPERTY_SOURCE(Part::AttachExtension, App::DocumentObjectExtension)
 
 AttachExtension::AttachExtension()
    :  _attacher(0)
@@ -110,17 +110,16 @@ bool AttachExtension::changeAttacherType(const char* typeName)
         AttachEngine* pNewAttacher = static_cast<Attacher::AttachEngine*>(Base::Type::createInstanceByName(typeName));
         this->setAttacher(pNewAttacher);
         return true;
-    } else {
-        std::stringstream errMsg;
-        errMsg << "Object if this type is not derived from AttachEngine: " << typeName;
-        throw Base::Exception(errMsg.str());
     }
-    assert(false);//exec shouldn't ever get here
-    return false;
+
+    std::stringstream errMsg;
+    errMsg << "Object if this type is not derived from AttachEngine: " << typeName;
+    throw AttachEngineException(errMsg.str());
 }
 
 bool AttachExtension::positionBySupport()
 {
+    _active = 0;
     if (!_attacher)
         throw Base::RuntimeError("AttachExtension: can't positionBySupport, because no AttachEngine is set.");
     updateAttacherVals();
@@ -128,11 +127,24 @@ bool AttachExtension::positionBySupport()
         if (_attacher->mapMode == mmDeactivated)
             return false;
         getPlacement().setValue(_attacher->calculateAttachedPlacement(getPlacement().getValue()));
+        _active = 1;
         return true;
     } catch (ExceptionCancel&) {
         //disabled, don't do anything
         return false;
     };
+}
+
+bool AttachExtension::isAttacherActive() const {
+    if(_active < 0) {
+        _active = 0;
+        try {
+            _attacher->calculateAttachedPlacement(getPlacement().getValue());
+            _active = 1;
+        } catch (ExceptionCancel&) {
+        }
+    }
+    return _active!=0;
 }
 
 short int AttachExtension::extensionMustExecute(void) {
@@ -260,12 +272,12 @@ void AttachExtension::updateAttacherVals()
                      this->AttachmentOffset.getValue());
 }
 
-App::PropertyPlacement& AttachExtension::getPlacement() {
-
-    if(!getExtendedObject()->isDerivedFrom(App::GeoFeature::getClassTypeId()))
-        throw Base::RuntimeError("AttachExtension not added to GeooFeature!");
-    
-    return static_cast<App::GeoFeature*>(getExtendedObject())->Placement;
+App::PropertyPlacement& AttachExtension::getPlacement() const {
+    auto pla = Base::freecad_dynamic_cast<App::PropertyPlacement>(
+            getExtendedObject()->getPropertyByName("Placement"));
+    if(!pla)
+        throw Base::RuntimeError("AttachExtension cannot find placement property");
+    return *pla;
 }
 
 PyObject* AttachExtension::getExtensionPyObject(void) {
@@ -275,6 +287,28 @@ PyObject* AttachExtension::getExtensionPyObject(void) {
         ExtensionPythonObject = Py::Object(new AttachExtensionPy(this),true);
     }
     return Py::new_reference_to(ExtensionPythonObject);
+}
+
+// ------------------------------------------------
+
+AttachEngineException::AttachEngineException()
+  : Base::Exception()
+{
+}
+
+AttachEngineException::AttachEngineException(const char * sMessage)
+  : Base::Exception(sMessage)
+{
+}
+
+AttachEngineException::AttachEngineException(const std::string& sMessage)
+  : Base::Exception(sMessage)
+{
+}
+
+AttachEngineException::AttachEngineException(const AttachEngineException &inst)
+  : Base::Exception(inst)
+{
 }
 
 

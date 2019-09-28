@@ -126,13 +126,14 @@ void QGIViewAnnotation::drawAnnotation()
     }
 
     const std::vector<std::string>& annoText = viewAnno->Text.getValues();
+    int fontSize = calculateFontPixelSize(viewAnno->TextSize.getValue());
 
     //build HTML/CSS formatting around Text lines
     std::stringstream ss;
     ss << "<html>\n<head>\n<style>\n";
     ss << "p {";
     ss << "font-family:" << viewAnno->Font.getValue() << "; ";
-    ss << "font-size:" << Rez::guiX(viewAnno->TextSize.getValue()) << "pt; ";   //not really pts???
+    ss << "font-size:" << fontSize << "px; ";
     if (viewAnno->TextStyle.isValue("Normal")) {
         ss << "font-weight:normal; font-style:normal; ";
     } else if (viewAnno->TextStyle.isValue("Bold")) {
@@ -156,7 +157,7 @@ void QGIViewAnnotation::drawAnnotation()
             ss << "<br>" << *it ;
         }
     }
-    ss << "</p>\n</body>\n</html> ";
+    ss << "<br></p>\n</body>\n</html> ";
 
     prepareGeometryChange();
     m_textItem->setTextWidth(Rez::guiX(viewAnno->MaxWidth.getValue()));

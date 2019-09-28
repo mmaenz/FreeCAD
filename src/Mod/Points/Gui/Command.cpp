@@ -56,7 +56,7 @@
 //===========================================================================
 // CmdPointsImport
 //===========================================================================
-DEF_STD_CMD_A(CmdPointsImport);
+DEF_STD_CMD_A(CmdPointsImport)
 
 CmdPointsImport::CmdPointsImport()
   : Command("Points_Import")
@@ -76,7 +76,7 @@ void CmdPointsImport::activated(int iMsg)
 
     QString fn = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
       QString::null, QString(), QString::fromLatin1("%1 (*.asc *.pcd *.ply);;%2 (*.*)")
-      .arg(QObject::tr("Point formats")).arg(QObject::tr("All Files")));
+      .arg(QObject::tr("Point formats"), QObject::tr("All Files")));
     if (fn.isEmpty())
         return;
 
@@ -103,7 +103,7 @@ bool CmdPointsImport::isActive(void)
         return false;
 }
 
-DEF_STD_CMD_A(CmdPointsExport);
+DEF_STD_CMD_A(CmdPointsExport)
 
 CmdPointsExport::CmdPointsExport()
   : Command("Points_Export")
@@ -126,7 +126,7 @@ void CmdPointsExport::activated(int iMsg)
     for (std::vector<App::DocumentObject*>::const_iterator it = points.begin(); it != points.end(); ++it) {
         QString fn = Gui::FileDialog::getSaveFileName(Gui::getMainWindow(),
           QString::null, QString(), QString::fromLatin1("%1 (*.asc *.pcd *.ply);;%2 (*.*)")
-          .arg(QObject::tr("Point formats")).arg(QObject::tr("All Files")));
+          .arg(QObject::tr("Point formats"), QObject::tr("All Files")));
         if (fn.isEmpty())
             break;
 
@@ -142,7 +142,7 @@ bool CmdPointsExport::isActive(void)
     return getSelection().countObjectsOfType(Points::Feature::getClassTypeId()) > 0;
 }
 
-DEF_STD_CMD_A(CmdPointsTransform);
+DEF_STD_CMD_A(CmdPointsTransform)
 
 CmdPointsTransform::CmdPointsTransform()
   :Command("Points_Transform")
@@ -179,7 +179,7 @@ bool CmdPointsTransform::isActive(void)
     return getSelection().countObjectsOfType(Points::Feature::getClassTypeId()) > 0;
 }
 
-DEF_STD_CMD_A(CmdPointsConvert);
+DEF_STD_CMD_A(CmdPointsConvert)
 
 CmdPointsConvert::CmdPointsConvert()
   :Command("Points_Convert")
@@ -264,7 +264,7 @@ bool CmdPointsConvert::isActive(void)
     return getSelection().countObjectsOfType(Base::Type::fromName("App::GeoFeature")) > 0;
 }
 
-DEF_STD_CMD_A(CmdPointsPolyCut);
+DEF_STD_CMD_A(CmdPointsPolyCut)
 
 CmdPointsPolyCut::CmdPointsPolyCut()
   :Command("Points_PolyCut")
@@ -299,7 +299,7 @@ void CmdPointsPolyCut::activated(int iMsg)
         }
 
         Gui::ViewProvider* pVP = getActiveGuiDocument()->getViewProvider( *it );
-        pVP->startEditing();
+        pVP->startEditing(Gui::ViewProvider::Cutting);
     }
 }
 

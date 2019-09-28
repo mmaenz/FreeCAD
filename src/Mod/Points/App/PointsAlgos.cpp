@@ -33,6 +33,7 @@
 #include "PointsAlgos.h"
 #include "Points.h"
 
+#include <Base/Converter.h>
 #include <Base/Exception.h>
 #include <Base/FileInfo.h>
 #include <Base/Console.h>
@@ -661,7 +662,7 @@ std::size_t PlyReader::readHeader(std::istream& in,
 {
     std::string line, element;
     std::vector<std::string> list;
-    std::size_t points = 0;
+    std::size_t numPoints = 0;
     // a pair of numbers of elements and the total size of the properties
     std::vector<std::pair<std::size_t, std::size_t> > count_props;
 
@@ -720,11 +721,11 @@ std::size_t PlyReader::readHeader(std::istream& in,
             std::size_t count = boost::lexical_cast<std::size_t>(list[2]);
             if (name == "vertex") {
                 element = name;
-                points = count;
+                numPoints = count;
             }
             else {
                 // if another element than 'vertex' comes first then calculate the offset
-                if (points == 0) {
+                if (numPoints == 0) {
                     count_props.push_back(std::make_pair(count, 0));
                 }
                 else {
@@ -817,7 +818,7 @@ std::size_t PlyReader::readHeader(std::istream& in,
         }
     }
 
-    return points;
+    return numPoints;
 }
 
 void PlyReader::readAscii(std::istream& inp, std::size_t offset, Eigen::MatrixXd& data)
@@ -1169,10 +1170,13 @@ std::size_t PcdReader::readHeader(std::istream& in,
         }
     }
 
+    std::size_t w = static_cast<std::size_t>(this->width);
+    std::size_t h = static_cast<std::size_t>(this->height);
+    std::size_t size = w * h;
     if (fields.size() != sizes.size() ||
         fields.size() != types.size() ||
         fields.size() != counts.size() ||
-        points != static_cast<std::size_t>(this->width * this->height)) {
+        points != size) {
         throw Base::BadFormatError("");
     }
 

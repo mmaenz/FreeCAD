@@ -1,6 +1,5 @@
 # ***************************************************************************
-# *                                                                         *
-# *   Copyright (c) 2017 - Markus Hovorka <m.hovorka@live.de>               *
+# *   Copyright (c) 2017 Markus Hovorka <m.hovorka@live.de>                 *
 # *                                                                         *
 # *   This program is free software; you can redistribute it and/or modify  *
 # *   it under the terms of the GNU Lesser General Public License (LGPL)    *
@@ -20,19 +19,20 @@
 # *                                                                         *
 # ***************************************************************************
 
-
-__title__ = "Electrostatic"
+__title__ = "FreeCAD FEM solver Elmer equation object Electrostatic"
 __author__ = "Markus Hovorka"
 __url__ = "http://www.freecadweb.org"
 
+## \addtogroup FEM
+#  @{
 
-import femtools.femutils as FemUtils
+import femtools.femutils as femutils
 from ... import equationbase
 from . import linear
 
 
 def create(doc, name="Electrostatic"):
-    return FemUtils.createObject(
+    return femutils.createObject(
         doc, name, Proxy, ViewProxy)
 
 
@@ -54,17 +54,19 @@ class Proxy(linear.Proxy, equationbase.ElectrostaticProxy):
         obj.addProperty(
             "App::PropertyBool", "CalculateSurfaceCharge",
             "Electrostatic", "Select type of solver for linear system")
-        '''
+        """
         #obj.addProperty(
             #"App::PropertyBool", "CalculateCapacitanceMatrix",
             #"Electrostatic", "Select type of solver for linear system")
         #obj.addProperty(
             #"App::PropertyInteger", "CapacitanceBodies",
             #"Electrostatic", "Select type of solver for linear system")
-        '''
+        """
 
         obj.Priority = 10
 
 
 class ViewProxy(linear.ViewProxy, equationbase.ElectrostaticViewProxy):
     pass
+
+##  @}
